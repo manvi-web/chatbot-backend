@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Snakemake: snake-like pipeline -->
+  <path d="M8 38 L8 28 L16 28 L16 18 L24 18 L24 28 L32 28 L32 18 L40 18 L40 10" stroke="#15803d" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Rule boxes at bends -->
+  <circle cx="8"  cy="38" r="4"   fill="#16a34a"/>
+  <circle cx="8"  cy="28" r="3.5" fill="#22c55e"/>
+  <circle cx="16" cy="28" r="3.5" fill="#22c55e"/>
+  <circle cx="16" cy="18" r="3.5" fill="#22c55e"/>
+  <circle cx="24" cy="18" r="4"   fill="#15803d"/>
+  <circle cx="24" cy="28" r="3.5" fill="#22c55e"/>
+  <circle cx="32" cy="28" r="3.5" fill="#22c55e"/>
+  <circle cx="32" cy="18" r="3.5" fill="#22c55e"/>
+  <circle cx="40" cy="18" r="3.5" fill="#22c55e"/>
+  <circle cx="40" cy="10" r="4"   fill="#16a34a"/>
+  <!-- Snake head -->
+  <ellipse cx="40" cy="8" rx="4" ry="3" fill="#166534"/>
+  <circle cx="38.5" cy="7" r="0.8" fill="white"/>
+  <circle cx="41.5" cy="7" r="0.8" fill="white"/>
+  <!-- Conda package hint -->
+  <rect x="20" y="38" width="8" height="5" rx="1.5" fill="#14532d" opacity="0.7"/>
+  <text x="24" y="42.5" font-size="3.5" fill="#86efac" text-anchor="middle" font-family="monospace">env</text>
+</svg>

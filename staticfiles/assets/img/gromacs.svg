@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- GROMACS: teal/blue MD simulation - atom lattice -->
+  <circle cx="24" cy="24" r="6" fill="#0d7d6e"/>
+  <circle cx="24" cy="24" r="2.5" fill="#5eead4" opacity="0.8"/>
+  <!-- 6 surrounding atoms -->
+  <circle cx="24" cy="10" r="4.5" fill="#0f9d8b"/>
+  <circle cx="24" cy="38" r="4.5" fill="#0f9d8b"/>
+  <circle cx="10" cy="24" r="4.5" fill="#0f9d8b"/>
+  <circle cx="38" cy="24" r="4.5" fill="#0f9d8b"/>
+  <circle cx="13" cy="13" r="3.5" fill="#14b8a6"/>
+  <circle cx="35" cy="35" r="3.5" fill="#14b8a6"/>
+  <!-- Bonds -->
+  <line x1="24" y1="18" x2="24" y2="14.5" stroke="#0d7d6e" stroke-width="2.5"/>
+  <line x1="24" y1="30" x2="24" y2="33.5" stroke="#0d7d6e" stroke-width="2.5"/>
+  <line x1="18" y1="24" x2="14.5" y2="24" stroke="#0d7d6e" stroke-width="2.5"/>
+  <line x1="30" y1="24" x2="33.5" y2="24" stroke="#0d7d6e" stroke-width="2.5"/>
+  <line x1="19.7" y1="19.7" x2="16.5" y2="16.5" stroke="#0d7d6e" stroke-width="2"/>
+  <line x1="28.3" y1="28.3" x2="31.5" y2="31.5" stroke="#0d7d6e" stroke-width="2"/>
+  <!-- velocity arrows -->
+  <path d="M38 10 L42 10 L40 8 M42 10 L40 12" stroke="#0d9488" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <path d="M6 38 L10 38 L8 36 M10 38 L8 40" stroke="#0d9488" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+</svg>

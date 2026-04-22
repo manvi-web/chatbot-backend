@@ -1,0 +1,9 @@
+venv/
+**pycache**/
+*.pyc
+db.sqlite3
+.env
+logs/
+media/
+*.log
+awscliv2.zip

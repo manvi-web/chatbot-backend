@@ -1,0 +1,4 @@
+{"Applications": [
+    {"name": "cuda", "ec2imagebuilderinstance": "g5.xlarge:g5.2xlarge:g5.4xlarge:g4dn.xlarge:g4dn.2xlarge:g4dn.4xlarge", "os": "alinux2", "ami":  "ami-02d9f8171b827b623"},
+    {"name": "cuda", "ec2imagebuilderinstance": "g5.xlarge:g5.2xlarge:g5.4xlarge:g4dn.xlarge:g4dn.2xlarge:g4dn.4xlarge", "os": "ubuntu2004", "ami": "ami-047116e59747bd2f2"},
+    {"name": "warpem", "ec2imagebuilderinstance": "g5.xlarge:g5.2xlarge:g5.4xlarge:g4dn.xlarge:g4dn.2xlarge:g4dn.4xlarge", "os": "windows", "ami": "ami-0c6b401ebe6bd5857"}]}

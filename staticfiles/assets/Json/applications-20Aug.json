@@ -1,0 +1,78 @@
+{
+    "Applications": [
+        {
+            "title": "Linux",
+            "imgName": "linuxLogo.png",
+            "packageName": "linux",
+            "licenced": false,
+            "description": "Linux is a family of open-source Unix-like operating systems based on the Linux kernel",
+            "version": "",
+            "cost": "$149",
+            "compatibleOS": [
+                "Ubuntu2004"
+            ],
+            "compatibleInfra": [
+                "SingleNode",
+                "parallelCluster"
+            ],
+            "compatibleDS": [
+                "Projects",
+                "Home",
+                "Data"
+            ],
+            "implemented": true
+        },
+        {
+            "title": "Relion",
+            "imgName": "relion-4.0.png",
+            "packageName": "relionv400",
+            "licenced": false,
+            "description": "Relion (for REgularised LIkelihood OptimisatioN, pronounce rely-on) is a software package that employs an empirical Bayesian approach for electron cryo-microscopy (cryo-EM) structure determination.",
+            "version": "v5.0",
+            "cost": "$1836.4",
+            "compatibleOS": [
+                "Ubuntu2004"
+            ],
+            "compatibleInfra": [
+                "SingleNode",
+                "parallelCluster"
+            ],
+            "compatibleDS": [
+                "Projects",
+                "Home",
+                "Data"
+            ],
+            "implemented": true
+        }
+    ],
+    "Visualization": [],
+    "Packages": [],
+    "os": [
+        {
+            "title": "Ubuntu2004",
+            "imgName": "ubuntu2004.png",
+            "packageName": "ubuntu2004",
+            "description": "Ubuntu is a Linux distribution based on Debian and composed mostly of free and open-source software."
+        }
+    ],
+    "DataSources": [
+        {
+            "title": "Projects",
+            "imgName": "project.png",
+            "packageName": "Projects",
+            "description": "Projects associated with application."
+        },
+        {
+            "title": "Home",
+            "imgName": "home.png",
+            "packageName": "Home",
+            "description": "User home directory."
+        },
+        {
+            "title": "Data",
+            "imgName": "data.png",
+            "packageName": "Data",
+            "description": "Cryo-EM data folder."
+        }
+    ]
+}

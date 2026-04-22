@@ -1,0 +1,31 @@
+{
+  "codeBuildProjectName": "ctx-numen-build",
+  "idPrefix": "ctx-numen-",
+  "statusPrefix": "Status: ",
+  "ipSelector": "PublicIpAddress",
+  "dcvSessionScript": "/opt/parallelcluster/scripts/pcluster_dcv_connect.sh",
+  "dcvSharedLocation": "/shared",
+  "PclusterDcvServerPortparam": "PclusterDcvServerPort",
+  "PclusterDcvSessionIdparam": "PclusterDcvSessionId",
+  "PclusterDcvSessionTokenparam": "PclusterDcvSessionToken",
+  "dcvURLTimeLimit": "30",
+  "warpemDefExpressNodeType": "g5.4xlarge",
+  "warpemDefebsrootdevName": "/dev/sda1",
+  "warpemDefebsvolSize": "128",
+  "sysprovideridentity": [
+    "cryosparcuser",
+    "sbgrid",
+    "numen",
+    "ssm-user",
+    "spack"
+  ],
+  "userlist": "devops/userlist/ctx-newuser-list.csv",
+  "licid": "l-xxxxxxxxxxx",
+  "grantorAccount": "",
+  "s3resourcebucket": "dev-ctx-numen-resource",
+  "cfnStatusPollerErrList": [
+    "FAILED",
+    "ROLLBACK",
+    "DELETE"
+  ]
+}

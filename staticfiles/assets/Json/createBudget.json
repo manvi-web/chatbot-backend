@@ -1,0 +1,13 @@
+{
+    "BudgetParameters":
+    {
+        "BudgetName": "Monthly EC2 Budget",
+        "BudgetLimit": "500",
+        "CostFiltersService":"Amazon Elastic Compute Cloud - Compute",
+        "TimeUnit": "MONTHLY",
+        "StartTimePeriod": "datetime.datetime(datetime.date.today().year, datetime.date.today().month, calendar.monthrange(datetime.date.today().year,datetime.date.today().month)[0])",
+        "EndTimePeriod":"datetime.datetime(datetime.date.today().year, datetime.date.today().month, calendar.monthrange(datetime.date.today().year,datetime.date.today().month)[1])",
+        "NotificationThreshold": 10,
+        "teamNotificationSubscribers":"numen-support-sun@clovertex.com"
+    }
+}

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- nf-core: green nextflow + curated pipelines badge -->
+  <!-- Hexagon badge -->
+  <polygon points="24,4 38,12 38,28 24,36 10,28 10,12" fill="#15803d" opacity="0.12" stroke="#16a34a" stroke-width="1.5"/>
+  <!-- Inner hex -->
+  <polygon points="24,10 34,16 34,26 24,32 14,26 14,16" fill="#16a34a" opacity="0.2"/>
+  <!-- nf pipeline arrow -->
+  <rect x="16" y="21" width="8" height="6" rx="2" fill="#15803d"/>
+  <polygon points="24,20 30,24 24,28" fill="#22c55e"/>
+  <!-- Curated checkmark -->
+  <circle cx="35" cy="12" r="6" fill="#16a34a"/>
+  <path d="M32 12 L34.5 14.5 L39 10" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Pipeline lines -->
+  <line x1="14" y1="24" x2="16" y2="24" stroke="#4ade80" stroke-width="2" stroke-linecap="round"/>
+  <!-- Community label -->
+  <rect x="13" y="36" width="22" height="5" rx="1.5" fill="#14532d" opacity="0.8"/>
+  <text x="24" y="40" font-size="3.5" fill="#86efac" text-anchor="middle" font-family="monospace">nf-core</text>
+</svg>

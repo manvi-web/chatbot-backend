@@ -1,0 +1,313 @@
+{
+  "Clustering": [
+    {
+      "title": "Instance",
+      "imgName": "Instance.png",
+      "packageName": "SingleNode",
+      "cost":"0",
+      "displayTitle":"Instance"
+    },
+    {
+      "title": "ParallelCluster",
+      "imgName": "parallelCluster.png",
+      "packageName": "parallelCluster",
+      "cost":"150",
+      "displayTitle":"Parallel Cluster"
+    },
+    {
+      "title": "SageMaker",
+      "imgName": "sagemaker.svg",
+      "packageName": "SageMaker",
+      "cost":"0",
+      "displayTitle":"SageMaker Notebook"
+    }
+  ],
+  "Instances": [
+    {
+      "title": "c6i",
+      "imgName": "C6i_Instance.png",
+      "packageName": "c6i",
+      "cost":"124",
+      "displayTitle": "C6I",
+      "type":"CPU",
+      "family":"c6i"
+    },
+    {
+      "title": "m6id",
+      "imgName": "m6id_Instance.png",
+      "packageName": "m6id",
+      "cost":"735",
+      "displayTitle": "M6ID",
+      "type":"CPU",
+      "family":"m6id"
+    },
+    {
+      "title": "m6in",
+      "imgName": "m6in_Instance.png",
+      "packageName": "m6in",
+      "cost":"735",
+      "displayTitle": "M6IN",
+      "type":"CPU",
+      "family":"m6in"
+    },
+    {
+      "title": "m6i",
+      "imgName": "m6i_Instance.png",
+      "packageName": "m6i",
+      "cost":"735",
+      "displayTitle": "M6I",
+      "type":"CPU",
+      "family":"m6i"
+    },
+    {
+      "title": "c6in",
+      "imgName": "c6in_Instance.png",
+      "packageName": "c6in",
+      "cost":"735",
+      "displayTitle": "C6IN",
+      "type":"CPU",
+      "family":"c6in"
+    },
+    {
+      "title": "c6id",
+      "imgName": "c6id_Instance.png",
+      "packageName": "c6id",
+      "cost":"735",
+      "displayTitle": "C6ID",
+      "type":"CPU",
+      "family":"c6id"
+    },
+    {
+      "title": "r6i",
+      "imgName": "r6i_Instance.png",
+      "packageName": "r6i",
+      "cost":"735",
+      "displayTitle": "R6I",
+      "type":"CPU",
+      "family":"r6i"
+    },
+    {
+      "title": "r6id",
+      "imgName": "r6id_Instance.png",
+      "packageName": "r6id",
+      "cost":"735",
+      "displayTitle": "R6ID",
+      "type":"CPU",
+      "family":"r6id"
+    },
+    {
+      "title": "g5",
+      "imgName": "G5_Instance.png",
+      "packageName": "g5",
+      "cost":"735",
+      "displayTitle": "G5",
+      "type":"GPU",
+      "family":"g5"
+    },
+    {
+
+      "title": "g4dn",
+      "imgName": "G5_Instance.png",
+      "packageName": "g4dn",
+      "cost":"735",
+      "displayTitle": "G4DN",
+      "type":"GPU",
+      "family":"g4dn"
+    }
+  ],
+  "masterInstances": [
+    {
+      "title": "c6i.xlarge",
+      "imgName": "C6i_Instance.png",
+      "packageName": "c6i.xlarge",
+      "cost":"124",
+      "displayTitle": "c6i.xlarge",
+      "type":"CPU"
+    },
+    {
+      "title": "m6i.xlarge",
+      "imgName": "m6i_Instance.png",
+      "packageName": "m6i.xlarge",
+      "cost":"2780",
+      "displayTitle": "m6i.xlarge",
+      "type":"CPU"
+    },
+    {
+      "title": "r6i.xlarge",
+      "imgName": "r6i_Instance.png",
+      "packageName": "r6i.xlarge",
+      "cost":"79",
+      "displayTitle": "r6i.xlarge",
+      "type":"CPU"
+    },
+    {
+      "title": "c6i.2xlarge",
+      "imgName": "C6i_Instance.png",
+      "packageName": "c6i.2xlarge",
+      "cost":"124",
+      "displayTitle": "c6i.2xlarge",
+      "type":"CPU"
+    },
+    {
+      "title": "m6i.2xlarge",
+      "imgName": "m6i_Instance.png",
+      "packageName": "m6i.2xlarge",
+      "cost":"184",
+      "displayTitle": "m6i.2xlarge",
+      "type":"CPU"
+    },
+    {
+      "title": "r6i.2xlarge",
+      "imgName": "r6i_Instance.png",
+      "packageName": "r6i.2xlarge",
+      "cost":"272",
+      "displayTitle": "r6i.2xlarge",
+      "type":"CPU"
+    },
+    {
+      "title": "c6in.2xlarge",
+      "imgName": "M4_Instance.png",
+      "packageName": "c6in.2xlarge",
+      "cost":"146",
+      "displayTitle": "c6in.2xlarge",
+      "type":"CPU"
+    }
+    
+  ],
+  "FileSystem": [
+    {
+      "title": "EBS-128GB",
+      "imgName": "Crysparc.png",
+      "packageName": "128",
+      "cost":"27",
+      "displayTitle": "EBS-128GB"
+    },
+    {
+      "title": "EBS-512GB",
+      "imgName": "Crysparc.png",
+      "packageName": "512",
+      "cost":"81",
+      "displayTitle": "EBS-512GB"
+    },{
+      "title": "EBS-1TB",
+      "imgName": "Crysparc.png",
+      "packageName": "1024",
+      "cost":"158",
+      "displayTitle": "EBS-1TB"
+    },
+    {
+      "title": "EFS-Home",
+      "imgName": "Home.png",
+      "packageName": "/home",
+      "cost":"0",
+      "displayTitle": "EFS-Home"
+    },{
+      "title": "FSX-1.2TB",
+      "imgName": "Cryo-dataset.png",
+      "packageName": "1200",
+      "cost":"168",
+      "displayTitle": "FSX-1.2TB"
+    },
+    {
+      "title": "FSX-2.4TB",
+      "imgName": "Cryo-dataset.png",
+      "packageName": "2400",
+      "cost":"336",
+      "displayTitle": "FSX-2.4TB"
+    },{
+      "title": "FSX-4TB",
+      "imgName": "Cryo-dataset.png",
+      "packageName": "4800",
+      "cost":"672",
+      "displayTitle": "FSX-4TB"
+    }
+  ],
+  "IdleTermination": [
+    {
+      "title": "30MIN",
+      "imgName": "30min.png",
+      "packageName": "30",
+      "cost":"0",
+      "displayTitle": "30 minutes"
+    },
+    {
+      "title": "60MIN",
+      "imgName": "60min.png",
+      "packageName": "60",
+      "cost":"0",
+      "displayTitle": "60 minutes"
+    },
+    {
+      "title": "90MIN",
+      "imgName": "90min.png",
+      "packageName": "90",
+      "cost":"0",
+      "displayTitle": "90 minutes"
+    },
+    {
+      "title": "NONE",
+      "imgName": "",
+      "packageName": "0",
+      "cost":"0",
+      "displayTitle": "None (keep running)"
+    }
+  ],
+  "SageMakerInstances": [
+    {
+      "title": "ml.t3.medium",
+      "packageName": "ml.t3.medium",
+      "displayTitle": "ml.t3.medium (2 vCPU / 4 GB)",
+      "type": "CPU",
+      "cost": "38"
+    },
+    {
+      "title": "ml.t3.large",
+      "packageName": "ml.t3.large",
+      "displayTitle": "ml.t3.large (2 vCPU / 8 GB)",
+      "type": "CPU",
+      "cost": "74"
+    },
+    {
+      "title": "ml.t3.xlarge",
+      "packageName": "ml.t3.xlarge",
+      "displayTitle": "ml.t3.xlarge (4 vCPU / 16 GB)",
+      "type": "CPU",
+      "cost": "148"
+    },
+    {
+      "title": "ml.m5.xlarge",
+      "packageName": "ml.m5.xlarge",
+      "displayTitle": "ml.m5.xlarge (4 vCPU / 16 GB)",
+      "type": "CPU",
+      "cost": "274"
+    },
+    {
+      "title": "ml.m5.2xlarge",
+      "packageName": "ml.m5.2xlarge",
+      "displayTitle": "ml.m5.2xlarge (8 vCPU / 32 GB)",
+      "type": "CPU",
+      "cost": "548"
+    },
+    {
+      "title": "ml.g4dn.xlarge",
+      "packageName": "ml.g4dn.xlarge",
+      "displayTitle": "ml.g4dn.xlarge (4 vCPU / 16 GB / 1 GPU)",
+      "type": "GPU",
+      "cost": "752"
+    },
+    {
+      "title": "ml.g4dn.2xlarge",
+      "packageName": "ml.g4dn.2xlarge",
+      "displayTitle": "ml.g4dn.2xlarge (8 vCPU / 32 GB / 1 GPU)",
+      "type": "GPU",
+      "cost": "1445"
+    },
+    {
+      "title": "ml.g4dn.4xlarge",
+      "packageName": "ml.g4dn.4xlarge",
+      "displayTitle": "ml.g4dn.4xlarge (16 vCPU / 64 GB / 1 GPU)",
+      "type": "GPU",
+      "cost": "2761"
+    }
+  ]
+}

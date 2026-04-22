@@ -1,0 +1,269 @@
+Region: {{ env['region'] }} 
+Image:
+  CustomAmi: {{ env['CUSTOMAMI'] }} 
+  Os: {{ env['BASEOS'] }} 
+CustomS3Bucket: {{ env['S3BUCKET'] }}
+Iam:
+  Roles:
+    LambdaFunctionsRole: arn:aws:iam::{{ env['accountid'] }}:role/{{ env['IAMLAMBDAROLE'] }} 
+Tags:
+  - Key:  Platform
+    Value: Numen
+  - Key:  CREATEDBY
+    Value: {{ env['CREATEDBY'] }}
+  - Key:  RESOURCEBUCKET
+    Value: {{ env['S3BUCKET'] }}
+  - Key:  SlurmQueuesTitle
+    Value: {{ env['SLURMQUEUES'] }}
+{%- if env['FILESYSTEM'] is defined %}
+  - Key:  FSXsize
+    Value: {{ env['FILESYSTEM'] }}
+{%- endif %}
+  - Key: InstanceType
+    Value: {{ env['MASTERNODETYPE'] }}
+  - Key: EBSSize
+    Value: EBS:{{ env['MASTERROOTVOLSIZE'] }}
+  - Key: CUSTOMNAME
+    Value: {{ env['CUSTOMNAME'] }}
+  - Key: InstanceName
+    Value: {{ env['INSTANCENAME'] }}
+  - Key: Environment
+    Value: {{ env['ENVIRONMENT'] }}
+  - Key: version
+    Value: 3/30/2022
+  - Key: application-name
+    Value: ctx-numen
+  - Key: application-owner
+    Value: baris.guler@clovertex.com
+  - Key: asec-tier
+    Value: wt
+  - Key: environment-id
+    Value: dev
+  - Key: is-multi-tenant
+    Value: 'FALSE'
+  - Key: it-technical-owner
+    Value: Adarsh.Jain@clovertex.com
+  - Key: ops-exclude-patch
+    Value: s1
+
+  
+HeadNode:
+  InstanceType: {{ env['MASTERNODETYPE'] }} 
+  Networking:
+    SubnetId: {{ env['MASTERSUBNETID'] }}
+    AdditionalSecurityGroups:
+      -  {{ env['ADDITIONALSECURITYGROUPID'] }}
+  Ssh:
+    KeyName: {{ env['KEYNAME'] }}  
+    AllowedIps: {{ env['SSHACCESSFROM'] }}
+  LocalStorage:
+    RootVolume:
+      Size: {{ env['MASTERROOTVOLSIZE']  }} 
+  Dcv:
+    Enabled:  true  
+    Port: {{ env['DCVPORT'] }}
+    AllowedIps: {{ env['DCVACCESSFROM'] }}
+  CustomActions:
+    OnNodeStart:
+      Script: s3://{{ env['S3BUCKET'] }}/parallelcluster-{{ env['CLUSTERNAME'] }}/preinstall/preinstall.sh
+      Args: 
+        - ' '
+    OnNodeConfigured:
+      Script: s3://{{ env['S3BUCKET']  }}/parallelcluster-{{ env['CLUSTERNAME'] }}/postinstall/postinstall.sh
+      Args: 
+        -  '{{ env['PACKAGES'] }}'
+  Iam:
+    InstanceRole: arn:aws:iam::{{ env['accountid'] }}:role/{{ env['EC2IAMROLE'] }}
+Scheduling:
+  Scheduler: {{ env['SCHEDULER'] }}
+  SlurmSettings:
+    ScaledownIdletime: {{ env['IDLETIME'] }}
+    EnableMemoryBasedScheduling: true
+  SlurmQueues:
+    {% if env['PART1_TYPE'] is defined %}
+    - Name: {{ env['PART1_NAME'] }}
+      ComputeResources:
+      {%- set instancetypelist = env['PART1_TYPE'].split(':') %}
+      {%- for instancetype in instancetypelist %} 
+      {%- set resourcename = instancetype.replace('.','-') %}
+        - Name: {{ resourcename }}
+          InstanceType: {{ instancetype }}
+          MinCount: 0
+          MaxCount: {{ env['PART1_MAXCOUNT'] }}
+      {%- endfor %}
+      CustomActions:    
+        OnNodeStart:
+          Script: s3://{{ env['S3BUCKET'] }}/parallelcluster-{{ env['CLUSTERNAME'] }}/preinstall/preinstall.sh
+          Args: 
+            - ' '
+        OnNodeConfigured:
+          Script: s3://{{ env['S3BUCKET']  }}/parallelcluster-{{ env['CLUSTERNAME'] }}/postinstall/postinstall.sh
+          Args: 
+            -  '{{ env['PACKAGES'] }}'
+      Iam:
+        InstanceRole: arn:aws:iam::{{ env['accountid'] }}:role/{{ env['EC2IAMROLE'] }} 
+      Networking:
+        SubnetIds: 
+          - {{ env['COMPUTESUBNETID'] }}
+        AdditionalSecurityGroups:
+          - {{ env['ADDITIONALSECURITYGROUPID'] }} 
+        PlacementGroup:
+          Enabled: true
+      ComputeSettings:
+        LocalStorage:
+          RootVolume:
+            Size:  {{ env['COMPUTEROOTVOLSIZE'] }}    
+    {% endif %} 
+    {% if env['PART2_TYPE'] is defined %}
+    - Name: {{ env['PART2_NAME'] }}
+      ComputeResources:
+      {%- set instancetypelist = env['PART2_TYPE'].split(':') %}
+      {%- for instancetype in instancetypelist %} 
+      {%- set resourcename = instancetype.replace('.','-') %}
+        - Name: {{ resourcename }}
+          InstanceType: {{ instancetype }}
+          MinCount: 0
+          MaxCount: {{ env['PART2_MAXCOUNT'] }}
+      {%- endfor %}
+      CustomActions:    
+        OnNodeStart:
+          Script: s3://{{ env['S3BUCKET'] }}/parallelcluster-{{ env['CLUSTERNAME'] }}/preinstall/preinstall.sh
+          Args: 
+            - ' '
+        OnNodeConfigured:
+          Script: s3://{{ env['S3BUCKET']  }}/parallelcluster-{{ env['CLUSTERNAME'] }}/postinstall/postinstall.sh
+          Args: 
+            -  '{{ env['PACKAGES'] }}'
+      Iam:
+        InstanceRole: arn:aws:iam::{{ env['accountid'] }}:role/{{ env['EC2IAMROLE'] }} 
+      Networking:
+        SubnetIds: 
+          - {{ env['COMPUTESUBNETID'] }}
+        AdditionalSecurityGroups:
+          - {{ env['ADDITIONALSECURITYGROUPID'] }} 
+        PlacementGroup:
+          Enabled: true
+      ComputeSettings:
+        LocalStorage:
+          RootVolume:
+            Size:  {{ env['COMPUTEROOTVOLSIZE'] }}    
+    {% endif %}
+    {% if env['PART3_TYPE'] is defined %}
+    - Name: {{ env['PART3_NAME'] }}
+      ComputeResources:
+      {%- set instancetypelist = env['PART3_TYPE'].split(':') %}
+      {%- for instancetype in instancetypelist %} 
+      {%- set resourcename = instancetype.replace('.','-') %}
+        - Name: {{ resourcename }}
+          InstanceType: {{ instancetype }}
+          MinCount: 0
+          MaxCount: {{ env['PART3_MAXCOUNT'] }}
+      {%- endfor %}
+      CustomActions:    
+        OnNodeStart:
+          Script: s3://{{ env['S3BUCKET'] }}/parallelcluster-{{ env['CLUSTERNAME'] }}/preinstall/preinstall.sh
+          Args: 
+            - ' '
+        OnNodeConfigured:
+          Script: s3://{{ env['S3BUCKET']  }}/parallelcluster-{{ env['CLUSTERNAME'] }}/postinstall/postinstall.sh
+          Args: 
+            -  '{{ env['PACKAGES'] }}'
+      Iam:
+        InstanceRole: arn:aws:iam::{{ env['accountid'] }}:role/{{ env['EC2IAMROLE'] }} 
+      Networking:
+        SubnetIds: 
+          - {{ env['COMPUTESUBNETID'] }}
+        AdditionalSecurityGroups:
+          - {{ env['ADDITIONALSECURITYGROUPID'] }} 
+        PlacementGroup:
+          Enabled: true
+      ComputeSettings:
+        LocalStorage:
+          RootVolume:
+            Size:  {{ env['COMPUTEROOTVOLSIZE'] }}    
+    {% endif %}
+    {% if env['PART4_TYPE'] is defined %}
+    - Name: {{ env['PART4_NAME'] }}
+      ComputeResources:
+      {%- set instancetypelist = env['PART4_TYPE'].split(':') %}
+      {%- for instancetype in instancetypelist %} 
+      {%- set resourcename = instancetype.replace('.','-') %}
+        - Name: {{ resourcename }}
+          InstanceType: {{ instancetype }}
+          MinCount: 0
+          MaxCount: {{ env['PART4_MAXCOUNT'] }}
+      {%- endfor %}
+      CustomActions:    
+        OnNodeStart:
+          Script: s3://{{ env['S3BUCKET'] }}/parallelcluster-{{ env['CLUSTERNAME'] }}/preinstall/preinstall.sh
+          Args: 
+            - ' '
+        OnNodeConfigured:
+          Script: s3://{{ env['S3BUCKET']  }}/parallelcluster-{{ env['CLUSTERNAME'] }}/postinstall/postinstall.sh
+          Args: 
+            -  '{{ env['PACKAGES'] }}'
+      Iam:
+        InstanceRole: arn:aws:iam::{{ env['accountid'] }}:role/{{ env['EC2IAMROLE'] }} 
+      Networking:
+        SubnetIds: 
+          - {{ env['COMPUTESUBNETID'] }}
+        AdditionalSecurityGroups:
+          - {{ env['ADDITIONALSECURITYGROUPID'] }} 
+        PlacementGroup:
+          Enabled: true
+      ComputeSettings:
+        LocalStorage:
+          RootVolume:
+            Size:  {{ env['COMPUTEROOTVOLSIZE'] }}    
+    {% endif %}
+    {% if env['PART5_TYPE'] is defined %}
+    - Name: {{ env['PART5_NAME'] }}
+      ComputeResources:
+      {%- set instancetypelist = env['PART5_TYPE'].split(':') %}
+      {%- for instancetype in instancetypelist %} 
+      {%- set resourcename = instancetype.replace('.','-') %}
+        - Name: {{ resourcename }}
+          InstanceType: {{ instancetype }}
+          MinCount: 0
+          MaxCount: {{ env['PART5_MAXCOUNT'] }}
+      {%- endfor %}
+      CustomActions:    
+        OnNodeStart:
+          Script: s3://{{ env['S3BUCKET'] }}/parallelcluster-{{ env['CLUSTERNAME'] }}/preinstall/preinstall.sh
+          Args: 
+            -  ' '
+        OnNodeConfigured:
+          Script: s3://{{ env['S3BUCKET']  }}/parallelcluster-{{ env['CLUSTERNAME'] }}/postinstall/postinstall.sh
+          Args: 
+            -  '{{ env['PACKAGES'] }}'
+      Iam:
+        InstanceRole: arn:aws:iam::{{ env['accountid'] }}:role/{{ env['EC2IAMROLE'] }} 
+      Networking:
+        SubnetIds: 
+          - {{ env['COMPUTESUBNETID'] }}
+        AdditionalSecurityGroups:
+          - {{ env['ADDITIONALSECURITYGROUPID'] }} 
+        PlacementGroup:
+          Enabled: true
+      ComputeSettings:
+        LocalStorage:
+          RootVolume:
+            Size:  {{ env['COMPUTEROOTVOLSIZE'] }}    
+    {% endif %}
+{%- if env['efshomefsid'] is defined %}
+SharedStorage:
+{%- endif %}
+{%- if env['efshomefsid'] is defined %}
+  - MountDir: {{ env['efshomeshareddir'] }}
+    Name: EFSHOME
+    StorageType: Efs
+    EfsSettings:
+      FileSystemId: {{ env['efshomefsid'] }}
+{%- endif %}
+{%- if env['ondemandFSXfsid'] is defined %}
+  - MountDir: {{ env['ondemandFSXmountdir'] }}
+    Name: ondemandFSX
+    StorageType: FsxLustre
+    FsxLustreSettings:
+      FileSystemId: {{ env['ondemandFSXfsid'] }}
+{%- endif %}

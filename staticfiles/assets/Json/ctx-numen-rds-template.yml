@@ -1,0 +1,187 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: NUMEN - Amazon RDS Database Instance
+
+Parameters:
+  DBInstanceIdentifier:
+    Type: String
+    Description: Unique identifier for the RDS instance
+
+  DBEngine:
+    Type: String
+    Description: Database engine type
+    AllowedValues:
+      - aurora-mysql
+      - aurora-postgresql
+      - mysql
+      - postgres
+      - mariadb
+      - oracle-ee
+      - sqlserver-se
+      - sqlserver-ee
+      - db2-se
+    Default: mysql
+
+  DBEngineVersion:
+    Type: String
+    Description: Database engine version
+    Default: '8.0.39'
+
+  DBInstanceClass:
+    Type: String
+    Description: DB instance class
+    Default: db.t3.medium
+
+  AllocatedStorage:
+    Type: Number
+    Description: Allocated storage in GiB
+    Default: 20
+    MinValue: 20
+    MaxValue: 65536
+
+  MaxAllocatedStorage:
+    Type: Number
+    Description: Maximum storage for auto-scaling in GiB
+    Default: 200
+    MinValue: 20
+    MaxValue: 65536
+
+  MultiAZ:
+    Type: String
+    Description: Multi-AZ deployment for high availability
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+
+  StorageType:
+    Type: String
+    Description: Storage type
+    Default: gp3
+    AllowedValues: [gp2, gp3, io1]
+
+  DBName:
+    Type: String
+    Description: Initial database name
+    Default: numendatabase
+    MaxLength: 64
+
+  MasterUsername:
+    Type: String
+    Description: Master database username
+    Default: admin
+    NoEcho: false
+
+  MasterUserPassword:
+    Type: String
+    Description: Master database password
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 41
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID for the database
+
+  SubnetId1:
+    Type: AWS::EC2::Subnet::Id
+    Description: First subnet for DB subnet group
+
+  SubnetId2:
+    Type: AWS::EC2::Subnet::Id
+    Description: Second subnet for DB subnet group (different AZ)
+
+  VpcSecurityGroupId:
+    Type: String
+    Description: Security group ID for the RDS instance
+
+  BackupRetentionPeriod:
+    Type: Number
+    Description: Number of days to retain automated backups
+    Default: 7
+    MinValue: 0
+    MaxValue: 35
+
+  CREATEDBY:
+    Type: String
+    Description: User who created the database
+    Default: numen-user
+
+  Environment:
+    Type: String
+    Description: Deployment environment
+    Default: dev
+
+Conditions:
+  IsMultiAZ: !Equals [!Ref MultiAZ, 'true']
+  IsProductionTemplate: !Equals [!Ref BackupRetentionPeriod, 35]
+
+Resources:
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub "NUMEN RDS Subnet Group for ${DBInstanceIdentifier}"
+      SubnetIds:
+        - !Ref SubnetId1
+        - !Ref SubnetId2
+      Tags:
+        - Key: Name
+          Value: !Sub "numen-rds-subnet-${DBInstanceIdentifier}"
+        - Key: Platform
+          Value: Numen
+        - Key: Environment
+          Value: !Ref Environment
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Ref DBInstanceIdentifier
+      DBInstanceClass: !Ref DBInstanceClass
+      Engine: !Ref DBEngine
+      EngineVersion: !Ref DBEngineVersion
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterUserPassword
+      DBName: !Ref DBName
+      AllocatedStorage: !Ref AllocatedStorage
+      MaxAllocatedStorage: !Ref MaxAllocatedStorage
+      StorageType: !Ref StorageType
+      StorageEncrypted: true
+      MultiAZ: !If [IsMultiAZ, true, false]
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref VpcSecurityGroupId
+      BackupRetentionPeriod: !Ref BackupRetentionPeriod
+      CopyTagsToSnapshot: true
+      AutoMinorVersionUpgrade: true
+      PubliclyAccessible: false
+      Tags:
+        - Key: Platform
+          Value: Numen
+        - Key: CREATEDBY
+          Value: !Ref CREATEDBY
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Name
+          Value: !Ref DBInstanceIdentifier
+
+Outputs:
+  DBEndpoint:
+    Description: RDS Database Endpoint Address
+    Value: !GetAtt DBInstance.Endpoint.Address
+    Export:
+      Name: !Sub "${AWS::StackName}-DBEndpoint"
+
+  DBPort:
+    Description: RDS Database Endpoint Port
+    Value: !GetAtt DBInstance.Endpoint.Port
+    Export:
+      Name: !Sub "${AWS::StackName}-DBPort"
+
+  DBInstanceId:
+    Description: RDS DB Instance Identifier
+    Value: !Ref DBInstance
+    Export:
+      Name: !Sub "${AWS::StackName}-DBInstanceId"
+
+  DBSubnetGroupName:
+    Description: DB Subnet Group Name
+    Value: !Ref DBSubnetGroup

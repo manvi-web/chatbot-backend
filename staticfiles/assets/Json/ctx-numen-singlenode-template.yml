@@ -1,0 +1,436 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Template to Create an EC2 instance in a VPC
+
+Parameters:
+
+  ImageId:
+    Type: String
+    Description: Ami to Launch ec2 instance With
+  VpcId:
+    Type: String
+    Description: VPC id
+  SubnetId:
+    Type: String
+    Description: Subnet in which to launch an EC2 and FSX
+  InstanceType:
+    Type: String
+    Description: aws Machine Type
+  KeyName:
+    Description: SSH Keypair to login to the instance
+    Type: String
+  SecurityGroup:
+    Description: Firewall Setting for the Instance
+    Type: String
+  ResId:
+    Description: Name for the ec2 instance
+    Type: String
+  Bucket:
+    Description: S3 Bucket to source scripts execution from
+    Type: String
+  IAMROLE:
+    Description: Iam role for the Single Node Resource Launch
+    Type: String
+  EBSROOTVOLSIZE:
+    Description: EBS Root volume Size
+    Type: String
+  EBSROOTDEVNAME:
+    Description: EBS Root volume Device Name
+    Type: String
+  PACKAGES:
+    Description: List of packages to load
+    Type: String
+  SelectedPackages:
+    Description: Comma-separated list of General Compute tools to install (e.g. Docker,Git,JupyterLab)
+    Type: String
+    Default: ""
+  fsxFileSystemType:
+    Type: String
+    Description: Type Of FileSystem
+  fsxFileSystemTypeVersion:
+    Type: String
+    Description: Version Of FileSystem
+  fsxStorageCapacity:
+    Type: Number
+    Description: Storage Capacity Of FileSystem in gigs
+  fsxSecurityGroupId:
+    Type: String
+    Description: fsxSecurityGroupId Of FileSystem
+  fsxDeploymentType:
+    Type: String
+    Description: fsxDeploymentType Of FileSystem
+  fsxImportBucket:
+    Type: String
+    Description: fsxImportBucket Of FileSystem
+  fsxImportBucketPrefix:
+    Type: String
+    Description: fsxImportBucketPrefix Of FileSystem
+  fsxStorageCreator:
+    AllowedValues:
+      - LFM
+      - CFN
+    Default: CFN
+    Type: String
+    Description: "we would provision fsx filesystem as part of the stack = CFN or using LFM"
+  efshomeshareddir:
+    Type: String
+    Description: efs home shared dir
+  efshomefsid:
+    Type: String
+    Description: file system id for efs home shared dir
+  instancename:
+    Type: String
+    Description: Instance Name configured from web Application
+
+
+Conditions:
+  CreatefsxResources: !Equals [!Ref fsxStorageCreator, CFN]
+
+Resources:
+  NumenInstance:
+    Type:   AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      PropagateTagsToVolumeOnCreation: 'true'
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+        - !Ref fsxSecurityGroupId
+      SubnetId: !Ref SubnetId
+      IamInstanceProfile: !Ref IAMROLE
+      BlockDeviceMappings:
+        - DeviceName: !Ref EBSROOTDEVNAME
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: !Ref EBSROOTVOLSIZE
+            Encrypted: 'true'
+      Tags:
+        - Key: Name
+          Value: !Ref instancename
+        - Key: BootstrapStatus
+          Value: Incomplete
+        - Key: version
+          Value: 3/30/2022
+        - Key: apms-id
+          Value: APMS-10027
+        - Key: application-name
+          Value: ctx-numen
+        - Key: asec-tier
+          Value: wt
+        - Key: environment-id
+          Value: dev
+        - Key: is-multi-tenant
+          Value: 'FALSE'
+        - Key: ops-exclude-patch
+          Value: s1
+        - Key: service-ci-id
+          Value: BSN0016208
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash -xe
+            echo "Executing USERDATA"
+            echo "Installing pip3 requests"
+            pip3 install requests boto3
+            scriptsdir=/opt/numen/scripts
+            mkdir -p $scriptsdir
+            aws s3 sync s3://${Bucket}/pcluster/scripts $scriptsdir
+            echo "Copying the config json from S3 and creating env file under $scriptsdir/config "
+            aws s3 cp s3://${Bucket}/devops/config.json $scriptsdir/config/config.json
+            sed 's/",$//g; s/"$//g; s/\[//g; s/\]//g; s/"/export /g '  $scriptsdir/config/config.json > $scriptsdir/config/config.env
+            ################################################################################################
+            echo "Runnning Dos2unix on all the files in the directory and subdirectories"
+            . /etc/os-release
+            if [[ ${!ID} == "ubuntu" ]]; then
+                sudo apt-get install -y dos2unix jq
+            elif [[ ${!ID} == "amzn" ]]; then
+                sudo yum install -y dos2unix jq
+            fi
+            find $scriptsdir -type f -exec dos2unix {} \;
+            ###############################################################################################
+            echo "Add CREATEDBY Tag and Name to EBS root volume"
+            TOKEN=$(curl -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 600" -s http://169.254.169.254/latest/api/token)
+            #AWS_AVAIL_ZONE=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
+            AWS_REGION=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq .region -r)
+            AWS_INSTANCE_ID=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/instance-id)
+            ROOT_VOLUME_IDS=$(aws ec2 describe-instances --region $AWS_REGION --instance-id $AWS_INSTANCE_ID --output text --query Reservations[0].Instances[0].BlockDeviceMappings[0].Ebs.VolumeId)
+            #TAG_VALUE=$(aws ec2 describe-tags --filters "Name=resource-id,Values=$AWS_INSTANCE_ID" "Name=key,Values=CREATEDBY" --region $AWS_REGION --output=text | cut -f5)
+            source $scriptsdir/config/config.env
+            NAME_VALUE=$(aws ec2 describe-tags --filters "Name=resource-id,Values=$AWS_INSTANCE_ID" "Name=key,Values=Name" --region $AWS_REGION --output=text | cut -f5)
+            IDENTIFIER=$(expr "$NAME_VALUE" : '.*\(...\)$')
+            EBS_NAME=$instanceidprefix'X'$IDENTIFIER-rfs
+            aws ec2 create-tags --resources $ROOT_VOLUME_IDS --region $AWS_REGION --tags Key=Name,Value=$EBS_NAME
+            #aws ec2 create-tags --resources $ROOT_VOLUME_IDS --region $AWS_REGION --tags Key=CREATEDBY,Value=$TAG_VALUE
+            ################################################################################################
+            echo "Invoking bash $scriptsdir/runbuild.sh ${PACKAGES} ${ResId} ${fsxStorageCreator} "
+            bash $scriptsdir/runbuild.sh ${PACKAGES} ${ResId} ${fsxStorageCreator}
+
+            # ── NICE DCV web viewer — ensure it is installed alongside dcvserver ───
+            if rpm -q nice-dcv-server &>/dev/null; then
+              if ! rpm -q nice-dcv-web-viewer &>/dev/null; then
+                echo ">>> Installing NICE DCV web viewer"
+                sudo yum install -y nice-dcv-web-viewer 2>&1 || true
+                echo "DCV web viewer: $(rpm -q nice-dcv-web-viewer 2>&1)"
+              else
+                echo "DCV web viewer already installed: $(rpm -q nice-dcv-web-viewer)"
+              fi
+              sudo systemctl enable dcvserver
+              sudo systemctl restart dcvserver || true
+              echo "dcvserver status: $(sudo systemctl is-active dcvserver)"
+            fi
+            # ── End DCV web viewer ───────────────────────────────────────────────
+
+            # ── Numen General Compute: install user-selected packages ──────────────
+            NUMEN_PKGS="${SelectedPackages}"
+            if [ -n "$NUMEN_PKGS" ]; then
+              echo "=== Numen package installer START: $NUMEN_PKGS ==="
+              . /etc/os-release
+              IS_UBUNTU=false
+              [[ $ID == "ubuntu" ]] && IS_UBUNTU=true
+              export DEBIAN_FRONTEND=noninteractive
+
+              _pkg_install() { $IS_UBUNTU && apt-get install -y "$@" || yum install -y "$@"; }
+
+              install_docker() {
+                echo ">>> Installing Docker"
+                if $IS_UBUNTU; then
+                  apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+                  apt-get update -y
+                  apt-get install -y ca-certificates curl gnupg lsb-release
+                  install -m 0755 -d /etc/apt/keyrings
+                  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+                  chmod a+r /etc/apt/keyrings/docker.gpg
+                  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+                  apt-get update -y
+                  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+                else
+                  amazon-linux-extras install docker -y 2>/dev/null || yum install -y docker
+                fi
+                systemctl enable --now docker
+                usermod -aG docker ec2-user 2>/dev/null || true
+                usermod -aG docker ubuntu 2>/dev/null || true
+                echo "Docker installed: $(docker --version 2>&1)"
+              }
+
+              install_vscode() {
+                echo ">>> Installing VS Code Server (code-server)"
+                curl -fsSL https://code-server.dev/install.sh | sh
+                systemctl enable --now code-server@root 2>/dev/null || true
+                echo "code-server installed: $(code-server --version 2>&1 | head -1)"
+              }
+
+              install_mambaforge() {
+                echo ">>> Installing Mambaforge (mamba/conda)"
+                MAMBA_INST=/tmp/Mambaforge-Linux-x86_64.sh
+                curl -fsSL "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-x86_64.sh" -o $MAMBA_INST
+                bash $MAMBA_INST -b -p /opt/mambaforge
+                /opt/mambaforge/bin/conda init bash
+                ln -sf /opt/mambaforge/bin/mamba /usr/local/bin/mamba
+                ln -sf /opt/mambaforge/bin/conda /usr/local/bin/conda
+                echo "Mambaforge installed: $(/opt/mambaforge/bin/mamba --version 2>&1 | head -1)"
+              }
+
+              install_jupyterlab() {
+                echo ">>> Installing JupyterLab"
+                if [ -f /opt/mambaforge/bin/mamba ]; then
+                  /opt/mambaforge/bin/mamba install -y -n base jupyterlab
+                elif [ -f /opt/anaconda3/bin/conda ]; then
+                  /opt/anaconda3/bin/conda install -y jupyterlab
+                else
+                  pip3 install --upgrade jupyterlab
+                fi
+                echo "JupyterLab installed: $(jupyter-lab --version 2>&1 || echo 'check jupyter')"
+              }
+
+              install_r() {
+                echo ">>> Installing R"
+                if $IS_UBUNTU; then
+                  apt-get update -y
+                  apt-get install -y r-base r-base-dev
+                else
+                  amazon-linux-extras enable R4 2>/dev/null || true
+                  yum install -y R
+                fi
+                echo "R installed: $(R --version 2>&1 | head -1)"
+              }
+
+              install_rstudio() {
+                echo ">>> Installing RStudio Server"
+                command -v R &>/dev/null || install_r
+                if $IS_UBUNTU; then
+                  apt-get install -y gdebi-core wget
+                  wget -q "https://download2.rstudio.org/server/jammy/amd64/rstudio-server-2023.12.1-402-amd64.deb" -O /tmp/rstudio.deb
+                  gdebi --non-interactive /tmp/rstudio.deb
+                else
+                  yum install -y wget
+                  wget -q "https://download2.rstudio.org/server/centos7/x86_64/rstudio-server-rhel-2023.12.1-402-x86_64.rpm" -O /tmp/rstudio.rpm
+                  yum install -y /tmp/rstudio.rpm
+                fi
+                echo "RStudio Server installed"
+              }
+
+              install_apptainer() {
+                echo ">>> Installing Apptainer (Singularity)"
+                if $IS_UBUNTU; then
+                  apt-get update -y && apt-get install -y wget
+                  wget -q "https://github.com/apptainer/apptainer/releases/download/v1.2.5/apptainer_1.2.5_amd64.deb" -O /tmp/apptainer.deb
+                  apt-get install -y /tmp/apptainer.deb
+                else
+                  yum install -y epel-release
+                  yum install -y apptainer 2>/dev/null || yum install -y singularity
+                fi
+                echo "Apptainer installed: $(apptainer --version 2>&1 || singularity --version 2>&1)"
+              }
+
+              install_anaconda() {
+                echo ">>> Installing Anaconda3"
+                ANACONDA_INST=/tmp/Anaconda3-Linux-x86_64.sh
+                curl -fsSL "https://repo.anaconda.com/archive/Anaconda3-2024.02-1-Linux-x86_64.sh" -o $ANACONDA_INST
+                bash $ANACONDA_INST -b -p /opt/anaconda3
+                ln -sf /opt/anaconda3/bin/conda /usr/local/bin/conda
+                echo "Anaconda installed: $(/opt/anaconda3/bin/conda --version 2>&1)"
+              }
+
+              install_git() {
+                echo ">>> Installing Git"
+                _pkg_install git
+                echo "Git installed: $(git --version 2>&1)"
+              }
+
+              # ── Clinical Data apps ─────────────────────────────────────────
+              install_redcap() {
+                echo ">>> Setting up REDCap environment (LAMP stack)"
+                if $IS_UBUNTU; then
+                  apt-get update -y
+                  apt-get install -y apache2 php php-mysql php-curl php-gd php-xml php-mbstring php-zip libapache2-mod-php mariadb-server
+                  systemctl enable --now apache2 mariadb
+                else
+                  yum install -y httpd php php-mysqlnd php-curl php-gd php-xml php-mbstring php-zip mariadb-server
+                  systemctl enable --now httpd mariadb
+                  systemctl start httpd mariadb || true
+                fi
+                mysql -e "CREATE DATABASE IF NOT EXISTS redcap CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" 2>/dev/null || true
+                mysql -e "CREATE USER IF NOT EXISTS 'redcapuser'@'localhost' IDENTIFIED BY 'NumRedCap2024!';" 2>/dev/null || true
+                mysql -e "GRANT ALL PRIVILEGES ON redcap.* TO 'redcapuser'@'localhost'; FLUSH PRIVILEGES;" 2>/dev/null || true
+                mkdir -p /var/www/html/redcap
+                printf '<h2>REDCap Setup Ready</h2>\n<p>LAMP stack configured. Download REDCap from https://project-redcap.org with your institutional license, upload to /var/www/html/redcap/ and run the installer.</p>\n<p>DB: redcap | User: redcapuser | Pass: NumRedCap2024!</p>\n' > /var/www/html/redcap/index.html
+                echo "REDCap LAMP stack ready. Apache on port 80. DB: redcap / redcapuser / NumRedCap2024!"
+                echo "Download REDCap from https://project-redcap.org with your institutional license."
+              }
+
+              install_labkey() {
+                echo ">>> Installing LabKey Server Community Edition via Docker"
+                command -v docker &>/dev/null || install_docker
+                docker pull labkey/labkey-server:community 2>&1 | tail -3 || true
+                docker run -d --name labkey \
+                  -p 8081:8080 \
+                  -e JAVA_OPTS="-Xmx4g" \
+                  --restart unless-stopped \
+                  labkey/labkey-server:community 2>/dev/null || echo "LabKey container start attempted"
+                echo "LabKey Server starting on port 8081 — allow 2-3 min to initialise. Access via http://localhost:8081"
+              }
+
+              install_openclinica() {
+                echo ">>> Installing OpenClinica Community Edition via Docker"
+                command -v docker &>/dev/null || install_docker
+                docker network create oc-net 2>/dev/null || true
+                docker run -d --name oc-postgres \
+                  --network oc-net \
+                  -e POSTGRES_DB=openclinica \
+                  -e POSTGRES_USER=clinica \
+                  -e POSTGRES_PASSWORD=clinica \
+                  --restart unless-stopped \
+                  postgres:13 2>/dev/null || echo "OC postgres start attempted"
+                sleep 15
+                docker run -d --name openclinica \
+                  --network oc-net \
+                  -p 8080:8080 \
+                  -e DB_HOST=oc-postgres \
+                  -e DB_NAME=openclinica \
+                  -e DB_USER=clinica \
+                  -e DB_PASS=clinica \
+                  --restart unless-stopped \
+                  openclinica/openclinica-ws:latest 2>/dev/null || echo "OpenClinica container start attempted"
+                echo "OpenClinica Community starting on port 8080 — allow 3-5 min to initialise. Access via http://localhost:8080/OpenClinica"
+              }
+
+              install_castor() {
+                echo ">>> Castor EDC is a cloud SaaS platform — no server installation required."
+                echo ">>> Access at https://data.castoredc.com with your commercial subscription."
+              }
+              # ── End Clinical apps ──────────────────────────────────────────
+
+              IFS=',' read -ra PKG_LIST <<< "$NUMEN_PKGS"
+              for raw_pkg in "${!PKG_LIST[@]}"; do
+                pkg=$(echo "$raw_pkg" | tr '[:upper:]' '[:lower:]' | xargs)
+                case "$pkg" in
+                  docker)                               install_docker ;;
+                  vscode|"vs code"|code-server|code)    install_vscode ;;
+                  mambaforge|mamba|"mamba / conda")     install_mambaforge ;;
+                  jupyterlab|jupyter)                   install_jupyterlab ;;
+                  r|"r runtime"|rlang)                  install_r ;;
+                  rstudio|"rstudio server"|"rstudio / posit workbench") install_rstudio ;;
+                  apptainer|singularity|"apptainer (singularity)") install_apptainer ;;
+                  anaconda|anaconda3)                   install_anaconda ;;
+                  git)                                  install_git ;;
+                  python3|python)                       echo ">>> Python3 already present: $(python3 --version 2>&1)" ;;
+                  redcap)                               install_redcap ;;
+                  "labkey server"|labkey)               install_labkey ;;
+                  openclinica)                          install_openclinica ;;
+                  "castor edc"|castor)                  install_castor ;;
+                  *)                                    echo ">>> Unknown package '$pkg' — skipping" ;;
+                esac
+              done
+              echo "=== Numen package installer COMPLETE ==="
+            fi
+            # ── End Numen package installer ────────────────────────────────────────
+
+            #Disable if the OS is Ubuntu
+            # Check if OS is Ubuntu
+            if grep -qi "ubuntu" /etc/os-release; then
+               echo "Ubuntu OS detected. Disabling upgrade prompts..."
+
+               # Disable the update notifier
+               sudo systemctl disable apt-daily.service
+               sudo systemctl disable apt-daily-upgrade.service
+               sudo systemctl mask apt-daily.service
+               sudo systemctl mask apt-daily-upgrade.service
+
+               # Disable update notifier GUI prompt (for desktop systems)
+               sudo sed -i 's/^Prompt=.*/Prompt=never/' /etc/update-manager/release-upgrades
+
+               # Remove the update-notifier package (optional for servers)
+               sudo apt-get remove -y update-notifier
+
+               echo "Upgrade prompts disabled."
+            else
+               echo "Not Ubuntu. No changes made."
+            fi
+
+  # FsxFileSystem:
+  #   Condition: CreatefsxResources
+  #   Type: AWS::FSx::FileSystem
+  #   Properties:
+  #     FileSystemType: !Ref fsxFileSystemType
+  #     FileSystemTypeVersion: !Ref fsxFileSystemTypeVersion
+  #     StorageCapacity: !Ref fsxStorageCapacity
+  #     SecurityGroupIds:
+  #       - !Ref fsxSecurityGroupId
+  #     SubnetIds:
+  #       - !Ref SubnetId
+  #     Tags:
+  #       - Key: "Name"
+  #         Value: !Ref ResId
+  #     LustreConfiguration:
+  #       DeploymentType: !Ref fsxDeploymentType
+  #       ImportPath: !Sub 's3://${fsxImportBucket}/${fsxImportBucketPrefix}'
+
+Outputs:
+  NumenInstanceId:
+    Description: The EC2 Instance ID
+    Value: !Ref NumenInstance
+  # FileSystemId:
+  #   Condition: CreatefsxResources
+  #   Description: The FSX FileSystem Id
+  #   Value: !Ref FsxFileSystem
+

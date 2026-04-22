@@ -1,0 +1,10 @@
+{
+    "relion3.1":["relion3.1","Alinux2","CryoEMProjects","Home","CryoEMData","Instance"],
+    "relion4.0":["relion4.0","Alinux2","CryoEMProjects","Home","CryoEMData","Instance"],
+    "cryosparc":["cryosparc","Alinux2","CryoEMProjects","Home","CryoEMData","parallelCluster"],
+    "Gromacs":["Gromacs","Alinux2","CryoEMProjects","Home","CryoEMData","Instance"],
+    "AlphaFold":["AlphaFold","Alinux2","CryoEMProjects","Home","CryoEMData","Instance"],
+    "Linux":["Linux","Alinux2","CryoEMProjects","Home","CryoEMData","Instance"],
+    "SBGrid":["SBGrid","Ubuntu2004","CryoEMProjects","Home","CryoEMData","Instance"],
+    "Warpem":["Warpem","Windows","CryoEMProjects","Home","CryoEMData","Instance"]
+}

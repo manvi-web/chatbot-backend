@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Cromwell/WDL: Broad Institute red, scatter-gather pattern -->
+  <circle cx="8"  cy="24" r="5" fill="#b91c1c"/>
+  <!-- Scatter -->
+  <line x1="13" y1="22" x2="20" y2="12" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+  <line x1="13" y1="24" x2="20" y2="24" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+  <line x1="13" y1="26" x2="20" y2="36" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+  <!-- Shards -->
+  <rect x="20" y="9"  width="8" height="6" rx="2" fill="#dc2626"/>
+  <rect x="20" y="21" width="8" height="6" rx="2" fill="#dc2626"/>
+  <rect x="20" y="33" width="8" height="6" rx="2" fill="#dc2626"/>
+  <!-- Gather -->
+  <line x1="28" y1="12" x2="35" y2="22" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+  <line x1="28" y1="24" x2="35" y2="24" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+  <line x1="28" y1="36" x2="35" y2="26" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="40" cy="24" r="5" fill="#b91c1c"/>
+  <!-- WDL tag -->
+  <rect x="18" y="40" width="12" height="5" rx="1.5" fill="#7f1d1d"/>
+  <text x="24" y="44" font-size="3.5" fill="#fca5a5" text-anchor="middle" font-family="monospace">WDL</text>
+</svg>

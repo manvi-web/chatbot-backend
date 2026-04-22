@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Numen - Amazon SageMaker Notebook Instance'
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: ml.t3.medium
+    AllowedValues:
+      - ml.t3.medium
+      - ml.t3.large
+      - ml.t3.xlarge
+      - ml.m5.xlarge
+      - ml.m5.2xlarge
+      - ml.g4dn.xlarge
+      - ml.g4dn.2xlarge
+      - ml.g4dn.4xlarge
+    Description: SageMaker Notebook ML instance type
+
+  ResId:
+    Type: String
+    Description: Unique resource identifier used as the Notebook Instance Name
+
+  InstanceName:
+    Type: String
+    Description: Human-readable display name tag for Numen dashboard
+
+  CreatedBy:
+    Type: String
+    Description: Email of the user who launched this instance
+
+  Environment:
+    Type: String
+    Description: Deployment environment (dev / demo / prod)
+
+  VolumeSizeInGB:
+    Type: Number
+    Default: 50
+    MinValue: 5
+    MaxValue: 16384
+    Description: Size of the EBS volume attached to the notebook in GB
+
+  IAMRoleName:
+    Type: String
+    Description: Name of the existing IAM role SageMaker will assume
+
+  SubnetId:
+    Type: String
+    Description: Subnet ID where the notebook instance will be placed
+
+  SecurityGroupId:
+    Type: String
+    Description: Security group ID attached to the notebook instance
+
+Resources:
+  SageMakerNotebookInstance:
+    Type: AWS::SageMaker::NotebookInstance
+    Properties:
+      NotebookInstanceName: !Ref ResId
+      InstanceType: !Ref InstanceType
+      RoleArn: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${IAMRoleName}'
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref SecurityGroupId
+      VolumeSizeInGB: !Ref VolumeSizeInGB
+      Tags:
+        - Key: Platform
+          Value: Numen
+        - Key: CREATEDBY
+          Value: !Ref CreatedBy
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: CUSTOMNAME
+          Value: !Ref ResId
+        - Key: Name
+          Value: !Ref InstanceName
+
+Outputs:
+  NumenSageMakerName:
+    Description: SageMaker Notebook Instance Name used by Numen for status tracking
+    Value: !Ref SageMakerNotebookInstance
+
+  NotebookInstanceURL:
+    Description: Base Notebook URL (use the Connect button for a pre-signed link)
+    Value: !Sub 'https://${SageMakerNotebookInstance}.notebook.${AWS::Region}.sagemaker.aws/'

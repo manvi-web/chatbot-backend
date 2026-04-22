@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Tower for Nextflow / Seqera: dark teal control plane -->
+  <defs>
+    <linearGradient id="tg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0891b2"/>
+      <stop offset="100%" stop-color="#0e7490"/>
+    </linearGradient>
+  </defs>
+  <!-- Control tower base -->
+  <rect x="18" y="34" width="12" height="8"  rx="2" fill="#0e7490"/>
+  <rect x="14" y="30" width="20" height="6"  rx="2" fill="#0891b2"/>
+  <!-- Tower shaft -->
+  <rect x="21" y="16" width="6"  height="16" rx="1.5" fill="url(#tg)"/>
+  <!-- Tower head / control room -->
+  <rect x="14" y="10" width="20" height="8"  rx="3" fill="#0891b2"/>
+  <rect x="16" y="12" width="16" height="4"  rx="1.5" fill="#cffafe" opacity="0.3"/>
+  <!-- Radar/signal rings -->
+  <circle cx="24" cy="6" r="3"  stroke="#22d3ee" stroke-width="1.5" fill="none" opacity="0.9"/>
+  <circle cx="24" cy="6" r="6"  stroke="#22d3ee" stroke-width="1"   fill="none" opacity="0.5"/>
+  <circle cx="24" cy="6" r="9"  stroke="#22d3ee" stroke-width="0.8" fill="none" opacity="0.25"/>
+  <!-- Pipeline indicators on base -->
+  <rect x="16" y="31" width="4" height="2" rx="0.5" fill="#22d3ee" opacity="0.8"/>
+  <rect x="22" y="31" width="4" height="2" rx="0.5" fill="#34d399" opacity="0.8"/>
+  <rect x="28" y="31" width="4" height="2" rx="0.5" fill="#22d3ee" opacity="0.6"/>
+  <!-- License badge -->
+  <circle cx="38" cy="10" r="5" fill="#155e75"/>
+  <text x="38" y="12" font-size="3.5" fill="#cffafe" text-anchor="middle" font-family="monospace">$$</text>
+</svg>

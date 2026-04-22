@@ -1,0 +1,1306 @@
+import boto3
+import random
+import time
+import string
+import re
+from botocore.config import Config
+from botocore.exceptions import ClientError
+from django.shortcuts import render,redirect
+from django.http import JsonResponse
+import json
+import logging
+import datetime
+import requests
+import logging
+import codecs
+from django.middleware import csrf
+from django.views.decorators.csrf import csrf_exempt
+from jinja2 import Template
+import subprocess
+import uuid
+import os
+
+
+
+
+
+
+logger = logging.getLogger(__name__)
+configOpen = open('staticfiles/assets/Json/config.json')
+configdata = json.load(configOpen)
+paramsOpen = open('staticfiles/assets/Json/inputParameters.json')
+paramdata = json.load(paramsOpen)
+instancebuildParameters = open('staticfiles/assets/Json/buildParameters.json')
+buildData = json.load(instancebuildParameters)
+instanceCount = open('staticfiles/assets/Json/instanceCount.json')
+instanceData = json.load(instanceCount)
+
+# Fsx params
+region_name = configdata["region"]
+
+# boto3 Params
+config = Config(retries={"max_attempts": 15, "mode": "standard"})
+codebuildClient = boto3.client("codebuild", config=config, region_name=region_name)
+cfnclient = boto3.client("cloudformation", config=config, region_name=region_name)
+ssmclient = boto3.client("ssm", config=config,region_name=region_name)
+ec2client = boto3.client("ec2", config=config,region_name=region_name)
+ec2_resource = boto3.resource('ec2', config=config,region_name=region_name)
+s3Resource = boto3.resource("s3",config=config, region_name=region_name)
+s3Client = boto3.client("s3",config=config, region_name=region_name)
+priceclient = boto3.client('pricing', region_name= region_name)
+fsxClient = boto3.client('fsx',config=config, region_name=region_name)
+budgetClient = boto3.client('budgets',config=config,region_name=region_name)
+stsClient = boto3.client("sts",config=config,region_name=region_name)
+snsClient = boto3.client("sns",config=config,region_name=region_name)
+
+
+# WaitTime in seconds for ssm Command Execution Status
+ssmMaxPolliterations = 15
+ssmwaitPerIteration = 2
+
+codeBuildProjectName = paramdata["codeBuildProjectName"]
+idPrefix = paramdata["idPrefix"]
+customerprefix = configdata["customerprefix"]
+statusPrefix = paramdata["statusPrefix"]
+sys_provider_identity =  paramdata["sysprovideridentity"]
+userlist = paramdata["userlist"]
+s3resourcebucket = paramdata["s3resourcebucket"]
+grantorAccount = paramdata["grantorAccount"]
+licid = paramdata["licid"]
+
+# DCV Params
+# possible Selection for ipSelector is 'PublicIpAddress' or 'PrivateIpAddress'
+ipSelector = paramdata["ipSelector"]
+dcvSessionScript = paramdata["dcvSessionScript"]
+dcvSharedLocation = paramdata["dcvSharedLocation"]
+PclusterDcvServerPortparam = paramdata["PclusterDcvServerPortparam"]
+PclusterDcvSessionIdparam = paramdata["PclusterDcvSessionIdparam"]
+PclusterDcvSessionTokenparam = paramdata["PclusterDcvSessionTokenparam"]
+dcvURLTimeLimit = paramdata["dcvURLTimeLimit"]
+cfnStatusPollerErrList = paramdata["cfnStatusPollerErrList"]
+warpemDefExpressNodeType = paramdata['warpemDefExpressNodeType']
+warpemDefebsrootdevName = paramdata['warpemDefebsrootdevName']
+warpemDefebsvolSize = paramdata['warpemDefebsvolSize']
+
+#Render Main Dashboard- Home Screen
+def RenderMainDashboard(request):
+    """
+        This method renders the expressLaunch screen
+        which is also our home screen.
+        It allows the user to launch their applications which are enabled in our Numen-UI.
+    """
+    try:
+        context={}
+        appListFile = open('staticfiles/assets/Json/applications.json')
+        applicationData = json.load(appListFile)
+        infraFile = open('staticfiles/assets/Json/customInfrastructure.json')
+        infrastructureData = json.load(infraFile)
+        instanceList = open('staticfiles/assets/Json/instancesListed.json')
+        instanceFamily = json.load(instanceList)
+        priceInstance = open('staticfiles/assets/Json/priceInstances.json')
+        instancePrice = json.load(priceInstance)
+        instanceInfo = open('staticfiles/assets/Json/instanceInfo.json')
+        instanceInfo = json.load(instanceInfo)
+        prefixList = []
+        datSetObj = s3Client.list_objects_v2(Bucket=configdata["dataBucket"],Delimiter='/')
+        if datSetObj.get('CommonPrefixes') is not None:
+            for obj in datSetObj.get('CommonPrefixes'):
+                s3URL ="s3://"+configdata["dataBucket"]+"/"+ obj.get('Prefix')
+                prefixList.append([obj.get('Prefix'),s3URL])
+        context['applicationsData'] = applicationData
+        context['infrastructureData'] = infrastructureData
+        context['instanceFamily'] = instanceFamily
+        context['instancePrices'] = instancePrice
+        context['dataBucketPrefix'] = prefixList
+        context['instanceInfo'] = instanceInfo["InstanceInfo"]
+        #createSNSNotification(request)
+        #getBudget(request)
+        return JsonResponse(context)
+    except Exception as e:
+        logger.warning("MainDashboard-"+str(datetime.datetime.now()))
+        logger.warning(e)
+
+
+def userExists(username):
+    try:
+        UserPresent = False
+        s3_object = s3Resource.Object(s3resourcebucket, userlist)
+        line_stream = codecs.getreader("utf-8")
+        for line in line_stream(s3_object.get()['Body']):
+            uname=line.split(",")[0]
+            if uname == username:
+                UserPresent =  True
+                break
+        return UserPresent
+    except Exception as E:
+        logger.warning("userExists-"+str(datetime.datetime.now()))
+        logger.warning(E)
+        return False
+
+def getUserCount():
+    try:
+        count = 0
+        s3_object = s3Resource.Object(s3resourcebucket, userlist)
+        line_stream = codecs.getreader("utf-8")
+        for line in line_stream(s3_object.get()['Body']):
+            uname=line.split(",")[0]
+            if uname in sys_provider_identity:
+                continue
+            else:
+                count = count + 1
+        return count
+    except Exception as E:
+        logger.warning("getUserCount-"+str(datetime.datetime.now()))
+        logger.warning(E)
+        return 0
+
+def getMaxUserEnt():
+    try:
+        entitlementName = "MaxUsers"
+        lic_client = boto3.client("license-manager", region_name = "us-east-1") # please do not change this  for region functionality
+        licArn = "arn:aws:license-manager::" + grantorAccount + ":license:" + licid
+        response = lic_client.get_license_usage(LicenseArn=licArn)
+        if 'LicenseUsage' in response:
+            if 'EntitlementUsages' in response['LicenseUsage']:
+                for ent in response['LicenseUsage']['EntitlementUsages']:
+                    if ent["Name"] == entitlementName:
+                        maxusage=ent["MaxCount"]
+                        return (int(maxusage) )
+    except Exception as E:
+        logger.warning("getMaxUserEnt-"+str(datetime.datetime.now()))
+        logger.warning(E)
+        return 0
+
+
+
+def getRemUserEnt():
+    try:
+        entitlementName = "MaxUsers"
+        lic_client = boto3.client("license-manager", region_name = "us-east-1") # please do not change this  for region functionality
+        licArn = "arn:aws:license-manager::" + grantorAccount + ":license:" + licid
+        response = lic_client.get_license_usage(LicenseArn=licArn)
+        if 'LicenseUsage' in response:
+            if 'EntitlementUsages' in response['LicenseUsage']:
+                for ent in response['LicenseUsage']['EntitlementUsages']:
+                    if ent["Name"] == entitlementName:
+                        usage=ent["ConsumedValue"]
+                        maxusage=ent["MaxCount"]
+                        return ( int(maxusage) - int (usage) )
+    except Exception as E:
+        logger.warning("getRemUserEnt-"+str(datetime.datetime.now()))
+        logger.warning(E)
+        return 0
+
+
+
+def allow_connect_launch(user):
+    try:
+        if userExists(user):
+            print("User "+ user  +"Found in Numen")
+            return True
+        else:
+            print("User "+ user  +"not Found in Numen")
+            max_ent = getMaxUserEnt()
+            print("Max Entitlement is "+str(max_ent))
+            abs_remaining = min(( max_ent -  getUserCount()), getRemUserEnt())
+            print("Abs Remaining is "+str(abs_remaining))
+            if abs_remaining >=1:
+                return True
+            else:
+                return False
+    except Exception as E:
+        logger.warning("allow_connect_launch-"+str(datetime.datetime.now()))
+        logger.warning(E)
+        return False
+
+
+
+#Render Display Resources
+def renderResources(request):
+    """
+        This method renders the display Resources filtered by the user
+    """
+    try:
+        userName = request.GET["username"]
+        context = {}
+        f = open('../scripts/result.json')
+        data = json.load(f)
+        for key in data.keys():
+            if 'Running'== key:
+                if(len(data[key]) >0):
+                    #data[key] = [x for x in data[key] if x['Environment'] == configdata["environment"]]
+                    data[key] = [x for x in data[key] if x['CREATEDBY'] == userName or x['sharable'] == 'true']
+            else:
+                if(len(data[key]) >0):
+                    #data[key] = [x for x in data[key] if x['Environment'] == configdata["environment"]]
+                    data[key] = [x for x in data[key] if x['CREATEDBY'] == userName]
+
+        f.close()
+        for value in data["Running"]:
+            if value['CREATEDBY'] != userName and value['sharable'] == 'true':
+                value["sharedInstance"] = True
+                value["sharedBy"] = value['CREATEDBY'].split("@")[0]
+        print(data["Running"])
+        context["data"] = data
+        return JsonResponse(context)
+    except Exception as e:
+        logger.warning("renderResources-"+str(datetime.datetime.now()))
+        logger.warning(e)
+
+def getApplicationTemplates(request):
+    """
+        This function returns the application templates for express Launch
+    """
+    try:
+        templatesFile = open('staticfiles/assets/Json/templates.json')
+        templateData = json.load(templatesFile)
+        applicationTemplateData = []
+        applicationTemplate = templateData["templates"]
+        context = {}
+        for templates in applicationTemplate:
+            temp=[i for i in templates['templateData'] if i["applicationName"] == request.GET["applicationName"]]
+            applicationTemplateData.append(temp[0])
+        context["data"] = applicationTemplateData
+        return JsonResponse(context)
+    except Exception as E:
+        logger.warning("getApplicationTemplates-"+str(datetime.datetime.now()))
+        print(E)
+
+def appLicenceCheck(application):
+    try:
+        f = open('../scripts/result.json')
+        f2 = open('staticfiles/assets/Json/licenceCount.json')
+        data = json.load(f)
+        data = data
+        token = 0
+        data2 = json.load(f2)
+        for x in data.keys():
+            for y in data[x]:
+                if application.replace(".","-") in y["StackName"]:
+                    token +=1
+        if token >= int(data2[application]):
+            return False
+        else:
+            return True
+    except Exception as e:
+        logger.warning("appLicenceCheck-"+str(datetime.datetime.now()))
+        logger.warning(e)
+
+
+@csrf_exempt
+def checkLaunch(request):
+    try:
+        body= json.loads(request.body)
+        osCheck = True if "os" in body.keys() else False
+        packages = True if "applicationName" in body.keys()  else False
+        clusterCheck =  True if body["clusterType"] != "" else False
+        NodeTypeCheck = False
+        appLicence = appLicenceCheck(body['applicationName'])
+        if clusterCheck :
+            if body["clusterType"] == "SINGLE":
+                NodeTypeCheck = True if len(body["nodes"]) == 1 else False
+            else:
+                NodeTypeCheck = True if len(body["nodes"]) == 1 else False
+                NodeTypeCheck = True if len(body["nodeGroups"]) > 0 else False
+        licencecheck= True #if buildData['license']['license_status'] == "PASSED" else False
+        user_name = body["email"].split("@")[0].replace(".", "_")
+        userCheck = True #if allow_connect_launch(user_name) else False
+        resultObj =  {}
+        if osCheck and packages and clusterCheck and NodeTypeCheck and licencecheck and userCheck and appLicence:
+            resultObj["canLaunch"] = True
+        else:
+            if osCheck == False:
+                resultObj["canLaunch"] = False
+                resultObj["exceptionMessage"] = "Please select valid operating system to proceed"
+            elif packages == False:
+                resultObj["canLaunch"] = False
+                resultObj["exceptionMessage"] = "Please select Application to proceed"
+            elif clusterCheck == False:
+                resultObj["canLaunch"] = False
+                resultObj["exceptionMessage"] = "Please select infrastructure to proceed"
+            elif NodeTypeCheck == False:
+                resultObj["canLaunch"] = False
+                resultObj["exceptionMessage"] = "Please select infrastructure to proceed"
+            elif licencecheck == False:
+                resultObj["canLaunch"] = False
+                resultObj["exceptionMessage"] = "No valid licence found. Please contact Numen support for licence to proceed."
+            elif userCheck == False:
+                resultObj["canLaunch"] = False
+                resultObj["exceptionMessage"] = "MaxUsers"
+            elif appLicence == False:
+                resultObj["canLaunch"] = False
+                resultObj["exceptionMessage"] = "The application you have requested have no licence left. Please terminate or stop one of the instance and relaunch again."
+        return JsonResponse(resultObj)
+    except Exception as E:
+        resultObj = {}
+        resultObj["canLaunch"] = False
+        resultObj["exceptionMessage"] = "Work in Progress"
+        resultObj["errorMess"] = E
+        logger.warning("appLicenceCheck-"+str(datetime.datetime.now()))
+        logger.warning(E)
+        return JsonResponse(resultObj)
+
+
+def getInstanceList(request) :
+    try:
+        param = request.GET["instancename"]
+        result = {}
+        if param.split('-')[0] == "cpu":
+                instn = getInstances(param)
+        else:
+                instn = getInstancesGPU(param)
+        result["values"] = instn.split(':')
+        return JsonResponse(result)
+    except Exception as E:
+        print(E)
+        logger.warning("getInstanceList-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+
+def getInstances(param):
+    try:
+        fileOpen1 = open('staticfiles/assets/Json/instanceListedPC.json')
+        instanceFamily = json.load(fileOpen1)
+        instancesList=instanceFamily['InstancesList']
+        params = param.split('-')
+        instances = [i[params[1]] for i in instancesList if list(i.keys())[0] == params[1]][0]
+        avg = round(len(instances)/2)
+        inst = ''
+        if params[2] == 'small':
+            inst = instances[0]+':'+instances[1]+':'+instances[2]
+        elif params[2] == 'medium':
+            inst = instances[avg-1]+':'+instances[avg]+':'+instances[avg+1]
+        elif params[2] == 'large':
+            inst = instances[len(instances)-3]+':'+instances[len(instances)-2]+':'+instances[len(instances)-1]
+        return str(inst)
+    except Exception as e:
+        logger.warning("getInstances-"+str(datetime.datetime.now()))
+        logger.warning(e)
+
+def getInstancesGPU(param):
+    try:
+        fileOpen1 = open('staticfiles/assets/Json/instancesListedPC.json')
+        instanceFamily = json.load(fileOpen1)
+        instancesList=instanceFamily['InstancesList']
+        params = param.split('-')
+        instances = [i[params[1]] for i in instancesList if list(i.keys())[0] == params[1]][0]
+        fileOpen2 = open('staticfiles/assets/Json/instanceInfo.json')
+        instancesInfo = json.load(fileOpen2)
+        instancesInfo = instancesInfo["InstanceInfo"]
+        instaL = []
+        retInstances = ''
+        for i in instances:
+            inst = [j["InstanceType"] for j in instancesInfo if j["InstanceType"] == i and j["GpuCount"] == int(params[2])]
+            if len(inst) >0:
+                instaL.append(inst[0])
+        if len(instaL) > 3 :
+            retInstances = instaL[0]+":"+instaL[1]+":"+instaL[2]+":"+instaL[3]+":"+instaL[4]
+        else:
+            retInstances = ":".join([str(elem) for i,elem in enumerate(instaL)])
+        return str(retInstances)
+    except Exception as e:
+        logger.warning("getInstancesGPU-"+str(datetime.datetime.now()))
+        logger.warning(e)
+
+def startCodeBuild(project, envParamsList):
+    """
+        This method related to the launch and helps the python application to start the code build in AWS
+    """
+    response = codebuildClient.start_build(
+        projectName=project, environmentVariablesOverride=envParamsList
+    )
+    return response
+
+def getProjectDetails(projectNameList):
+        response = codebuildClient.batch_get_projects(names=projectNameList)
+        return response
+
+def getCustomAMI(os):
+    """
+        This fetches the AMI id for the respective application and os from th amiImages.JSOn
+    """
+    try:
+        fileOpen = open('staticfiles/assets/Json/amiImages.json')
+        data = json.load(fileOpen)
+        amiImage = "Fail"
+        for i in data["Applications"]:
+            if os.lower() == i["os"].lower():
+                amiImage=i["ami"]
+        return amiImage
+    except Exception as E:
+        logger.warning("getCustomAMI-"+str(datetime.datetime.now()))
+        logger.warning(E)
+        return "Fail"
+
+def getCloudformationStackStatus(StackName):
+    """
+        This fetches the stack information for a specific stack name
+    """
+    try:
+        response = cfnclient.describe_stacks(StackName=StackName)
+        return response
+    except Exception as e:
+        logger.warning("getCloudformationStackStatus-"+str(datetime.datetime.now()))
+        logger.warning(e)
+
+def StackExists(StackName):
+    """
+        A boolean method which informs if the stack exists in AWS
+    """
+    try:
+        response = cfnclient.describe_stacks(StackName=StackName)
+        return True
+    except ClientError:
+        return False
+
+
+def getCloudformationStackResource(StackName, ResourceId):
+    """
+        This fetches the cloud formation stack with stackname and resource id
+    """
+    try:
+        response = cfnclient.describe_stack_resource(
+            StackName=StackName, LogicalResourceId=ResourceId
+        )
+        return response
+    except Exception as e:
+        #print(e)
+        logger.warning("getCloudformationStackResource-"+str(datetime.datetime.now()))
+        logger.warning(e)
+        return "Undefined"
+
+
+def getBuildDetails(BuildId):
+    response = codebuildClient.batch_get_builds(ids=[BuildId])
+    return response
+
+def getssmResults(instanceid, DocName, CommandList):
+    try:
+        response = ssmclient.send_command(
+            InstanceIds=[instanceid],
+            DocumentName=DocName,
+            Parameters={"commands": [CommandList]},
+        )
+        command_id = response["Command"]["CommandId"]
+        for i in range(ssmMaxPolliterations):
+            time.sleep(ssmwaitPerIteration)
+            output = ssmclient.get_command_invocation(
+                CommandId=command_id, InstanceId=instanceid
+            )
+            if output["Status"] == "Success" and output["ResponseCode"] == 0:
+                return (
+                    "Success"
+                    if not output["StandardOutputContent"]
+                    else output["StandardOutputContent"]
+                )
+            else:
+                continue
+    except Exception as E:
+        logger.warning("getssmResults-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+
+def getec2Details(InstanceID):
+    try:
+        response = ec2client.describe_instances(InstanceIds=[InstanceID])
+        return response
+    except Exception as E:
+        logger.warning("getec2Details-"+str(datetime.datetime.now()))
+        logger.warning(E)
+        return "NULL"
+
+def getUniqId(N):
+    return "".join(random.choices(string.ascii_uppercase + string.digits, k=N))
+
+
+def getnicAttr(Attribute, nicId):
+    response = ec2client.describe_network_interface_attribute(
+        Attribute=Attribute, NetworkInterfaceId=nicId
+    )
+    return response
+
+def builddcvURL(tokenString, hostname):
+    componentsList = tokenString.split(" ")
+    for i in range(len(componentsList)):
+        if PclusterDcvServerPortparam in componentsList[i]:
+            dcvPort = componentsList[i].split("=")[-1].strip()
+        elif PclusterDcvSessionIdparam in componentsList[i]:
+            dcvSessionId = componentsList[i].split("=")[-1].strip()
+        elif PclusterDcvSessionTokenparam in componentsList[i]:
+            dcvSessionToken = componentsList[i].split("=")[-1].strip()
+    return (
+        "https://"
+        + hostname
+        + ":"
+        + dcvPort
+        + "?authToken="
+        + dcvSessionToken
+        + "#"
+        + dcvSessionId
+    )
+
+
+def deletecfnstack(stackName):
+    try:
+
+        fileSystemId = "NotExists"
+        fileSystemId= getfsxId(stackName)
+        #print(fileSystemId)
+        response = cfnclient.delete_stack(StackName=stackName,RetainResources=[])
+        if fileSystemId != "NotExists":
+            response2 = fsxClient.delete_file_system(FileSystemId=fileSystemId)
+        return response
+    except Exception as E:
+        logger.warning("DeleteCFn-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+
+def getfsxId(stackname):
+    try:
+        sName = ""
+        cfnStatusresponse = getCloudformationStackStatus(stackname)
+        if 'Tags' in cfnStatusresponse["Stacks"][0].keys():
+                    for stack in cfnStatusresponse["Stacks"][0]["Tags"]:
+                        if stack["Key"] == "CUSTOMNAME":
+                           sName = stack["Value"]
+        fsxid = "NotExists"
+        response=fsxClient.describe_file_systems()
+        response = response["FileSystems"]
+        for i in response:
+            for j in i["Tags"]:
+                if j["Key"]== 'FSXName' and j["Value"] == sName:
+                    fsxid = i["FileSystemId"]
+                    break
+            if fsxid != "NotExists":
+                break
+        return fsxid
+    except Exception as E:
+        logger.warning("GetFsxId-"+str(datetime.datetime.now()))
+        logger.warning(E)
+        return fsxid
+
+@csrf_exempt
+def deleteResourceButton(request):
+    try:
+        status = False
+        body= json.loads(request.body)
+        StackName = body["stackName"]
+        if "instanceId" in body.keys():
+            instanceId = body["instanceId"]
+            machineAttrs=ec2_resource.Instance(instanceId)
+            response = machineAttrs.state['Name']
+            if response == 'running':
+                if 'warpem' in StackName:
+                    retValue =  getssmResults(instanceId, "AWS-RunPowerShellScript", "python C:\\Numen\\temp\\ImageBuilder\\cleanup_listener.py")
+                else:
+                    retValue = getssmResults(instanceId, "AWS-RunShellScript", f"bash /opt/numen/scripts/nicedcv/cleanup_listener.sh")
+                response = deletecfnstack(StackName)
+                if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+                    status = True
+                    removeStackId(StackName)
+            elif response == 'stopped':
+                response = ec2client.start_instances(InstanceIds=[instanceId])
+                time.sleep(5)
+                if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+                    if 'warpem' in StackName:
+                        retValue =  getssmResults(instanceId, "AWS-RunPowerShellScript", "python C:\\Numen\\temp\\ImageBuilder\\cleanup_listener.py")
+                    else:
+                        retValue = getssmResults(instanceId, "AWS-RunShellScript", f"bash /opt/numen/scripts/nicedcv/cleanup_listener.sh")
+                    response = deletecfnstack(StackName)
+                    if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+                        status = True
+                        removeStackId(StackName)
+        else:
+            response = deletecfnstack(StackName)
+            if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+                status = True
+                removeStackId(StackName)
+        obj_dict = {
+            "status":status
+           }
+        return JsonResponse(obj_dict)
+    except Exception as E :
+        logger.warning("DeleteEc2-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+#Start the Ec2Instance
+@csrf_exempt
+def startResourceButton(request):
+    try:
+        status = False
+        body= json.loads(request.body)
+        instanceId = body["instanceId"]
+        stackName = body["stackName"]
+        response = ec2client.start_instances(InstanceIds=[instanceId])
+        if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+            status = True
+        obj_dict = {
+            "status":status
+           }
+        return JsonResponse(obj_dict)
+    except Exception as E :
+        logger.warning("StartResourceButton-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+#Stop the Ec2Instance
+@csrf_exempt
+def stopResourceButton(request):
+    try:
+        status = False
+        body= json.loads(request.body)
+        instanceId = body["instanceId"]
+        stackName = body["stackName"]
+        response = ec2client.stop_instances(InstanceIds=[instanceId])
+        if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+            status = True
+            timeNow = datetime.datetime.now()
+            timeNow = timeNow.strftime("%d-%m-%Y %H:%M:%S")
+            response = ec2client.create_tags(
+                Resources=[instanceId,],
+                Tags=[{'Key': 'StoppedSince','Value': timeNow}])
+        obj_dict = {
+            "status":status
+           }
+        return JsonResponse(obj_dict)
+    except Exception as E :
+        logger.warning("StopResource-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+#TerminateResourceButton
+@csrf_exempt
+def terminateResourceButton(request):
+    try:
+        body= json.loads(request.body)
+        instanceId = body["instanceId"]
+        stackName = body["stackName"]
+        response = ec2client.terminate_instances(InstanceIds=[instanceId])
+        if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+            return renderResources(request)
+    except Exception as E :
+        logger.warning("TerminateResourceButton-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+#RebootEC2Instance
+@csrf_exempt
+def rebootResourceButton(request):
+    try:
+        status = False
+        body= json.loads(request.body)
+        instanceId = body["instanceId"]
+        stackName = body["stackName"]
+        response = ec2client.reboot_instances(InstanceIds=[instanceId])
+        if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+            status = True
+        obj_dict = {
+            "status":status
+           }
+        return JsonResponse(obj_dict)
+    except Exception as E :
+        logger.warning("RebootResourceButton-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+#Building DCV URL
+@csrf_exempt
+def connectEC2Machine(request):
+    try:
+        body= json.loads(request.body)
+        instanceId = body["instanceId"]
+        alb = body["alb"]
+        stackName = body["stackName"]
+        print(instanceId,alb,stackName)
+        machineAttrs = getec2Details(instanceId)
+        tags = machineAttrs["Reservations"][0]["Instances"][0]['Tags']
+        tagValue = [i['Value'] for i in tags if i['Key'] == 'Port']
+        stackName = [i['Value'] for i in tags if i['Key'] == 'CUSTOMNAME'][0]
+        resourcebucket = [i['Value'] for i in tags if i['Key'] == 'RESOURCEBUCKET'][0]
+        PriorityValue = [i['Value'] for i in tags if i['Key'] == 'PriorityOrder']
+        Email = body["email"]
+        Nodeuser = Email.split("@")[0].replace(".", "_")
+        """ if not allow_connect_launch(Nodeuser):
+            obj_dict = {"Status": "max_userlicense_count" }
+            print(obj_dict)
+            return JsonResponse(obj_dict) """
+
+        if "warpem" in stackName:
+            checkuser = getssmResults(instanceId, "AWS-RunPowerShellScript", "powershell.exe -File C:\\Numen\\temp\\ImageBuilder\\create_user.ps1 "+Nodeuser).strip()
+            url = getssmResults(instanceId, "AWS-RunPowerShellScript", "powershell.exe -File C:\\Numen\\temp\\ImageBuilder\\create_dcvsession.ps1 "+Nodeuser+" "+alb).strip()
+            occ_locatorval = 3
+            dec_list = [m.start() for m in re.finditer(r"/", url)]
+            if len(dec_list)>= occ_locatorval:
+                queryparam=url[dec_list[occ_locatorval-1]+1:]
+                obj_dict = {
+                    "dcvInfo": alb+":"+tagValue[0]+"/"+PriorityValue[0]+"/"+queryparam,
+                    "Status": "Workflow Completed, Please Click on below link within "
+                    + dcvURLTimeLimit
+                    + " Seconds to access the Node",
+                }
+            return JsonResponse(obj_dict)
+        application = ""
+        if "sn" in stackName:
+            application = stackName.split('-')[1]
+        else:
+            application = stackName.split('-')[0]
+        if "cryoSPARC" in stackName:
+            checkuser = getssmResults(instanceId, "AWS-RunShellScript", f"bash /opt/numen/scripts/nicedcv/dcvuser.sh {Nodeuser} {Email} true {application} {resourcebucket}").strip()
+            obj_dict = {
+                            "dcvInfo": alb+":"+"444"+"/",
+                            "Status": "Workflow Completed, Please Click on below link within "
+                            + dcvURLTimeLimit
+                            + " Seconds to access the Node",
+                        }
+            print(obj_dict)
+            return JsonResponse(obj_dict)
+        else:
+            checkuser = getssmResults(instanceId, "AWS-RunShellScript", f"bash /opt/numen/scripts/nicedcv/dcvuser.sh {Nodeuser} {Email} false {application} {resourcebucket}").strip()
+            url =  getssmResults(instanceId, "AWS-RunShellScript", f"bash /opt/numen/scripts/nicedcv/dcvlink.sh {Nodeuser} {stackName}").strip()
+            occ_locatorval = 3
+            dec_list = [m.start() for m in re.finditer(r"/", url)]
+            if len(dec_list)>= occ_locatorval:
+                queryparam=url[dec_list[occ_locatorval-1]+1:]
+            obj_dict = {
+                            "dcvInfo": alb+":"+tagValue[0]+"/"+PriorityValue[0]+"/"+queryparam,
+                            "Status": "Workflow Completed, Please Click on below link within "
+                            + dcvURLTimeLimit
+                            + " Seconds to access the Node",
+                        }
+            print(obj_dict)
+            return JsonResponse(obj_dict)
+    except Exception as e:
+        logger.warning("connectEC2Machine-"+str(datetime.datetime.now()))
+        logger.warning("connectEC2Machine",e)
+
+
+def getInstancetag(instanceId, tagKey):
+    try:
+        response = ec2client.describe_tags(
+                    Filters=[
+                        {
+                            'Name': 'resource-id',
+                            'Values': [
+                                instanceId,
+                            ],
+                        },
+                    ],
+        )
+    except Exception as E:
+        logger.warning("getInstancetag-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+def getLicencestatus():
+    """
+        This checks the licencing for the client to launch application using Numen
+    """
+    try:
+        status = "NULL"
+        EnvVars = getProjectDetails([codeBuildProjectName])["projects"][0]["environment"][
+                "environmentVariables"
+            ]
+        for env in EnvVars:
+                if env["name"] == "lic_status":
+                   print(env["value"])
+                   status = env["value"]
+                   break;
+        obj_dict = {
+            "status":status
+           }
+        return status
+    except Exception as E:
+        logger.warning("getLicencestatus-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+@csrf_exempt
+def shareResourceButton(request):
+    """
+        This method enables the user to share the instance dcv with other across the organisation
+    """
+    try:
+        status = False
+        body= json.loads(request.body)
+        instanceId = body["instanceId"]
+        stackName = body["stackName"]
+        response = ec2client.create_tags(
+                Resources=[instanceId,],
+                Tags=[{'Key': 'sharable','Value': 'true'},{'Key': 'shareWith','Value': 'ALL'}])
+        if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+            status = True
+        obj_dict = {
+            "status":status
+           }
+        return JsonResponse(obj_dict)
+    except Exception as E:
+        logger.warning("ShareResourceButton-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+
+@csrf_exempt
+def unShareResourceButton(request):
+    """
+        This method enables the user to unshare the instance dcv with other across the organisation
+    """
+    try:
+        status = False
+        body= json.loads(request.body)
+        instanceId = body["instanceId"]
+        stackName = body["stackName"]
+        response = ec2client.create_tags(
+            Resources=[
+                instanceId,
+            ],
+            Tags=[
+                {
+                    'Key': 'sharable',
+                    'Value': 'false'
+                }
+            ])
+        if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+            status = True
+        obj_dict = {
+            "status":status
+           }
+        return JsonResponse(obj_dict)
+    except Exception as E:
+        logger.warning("UnShareResourceButton-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+#Budgets
+def getBudget(request):
+    try:
+        accountId=stsClient.get_caller_identity()["Account"]
+        userName = request.GET["username"]
+        response = budgetClient.describe_budgets(AccountId=accountId, MaxResults= 99)
+        fileOpen = open('../django_forms/staticfiles/assets/Json/createBudget.json')
+        data = json.load(fileOpen)
+        budgetLimit = data["BudgetParameters"]["BudgetLimit"]
+        calculatedSpend = 0
+        forecastedSpend = 0
+        budgetDetails = {}
+        budgetDetails["snsCreated"] = False
+        if "Budgets" in response.keys():
+            currentBudget=[i for i in response["Budgets"] if i['BudgetName'] == userName.split('.')[0]+"'s "+ configdata["environment"] +" Monthly Budget"]
+            if len(currentBudget) > 0:
+                if 'CalculatedSpend' in currentBudget[0].keys():
+                    budgetLimit = int(round(float(currentBudget[0]['BudgetLimit']['Amount']),0))
+                    calculatedSpend = int(round(float(currentBudget[0]['CalculatedSpend']['ActualSpend']['Amount']),0))
+                    if "ForecastedSpend" in currentBudget[0]['CalculatedSpend'].keys():
+                        forecastedSpend = int(round(float(currentBudget[0]['CalculatedSpend']['ForecastedSpend']['Amount']),0))
+                    budgetDetails["budgetLimt"] = budgetLimit
+                    budgetDetails["calculatesSpend"] = calculatedSpend
+                    budgetDetails["forecastedSpend"] = forecastedSpend
+            else:
+                budgetDetails=createBudget(data,request,userName,accountId)
+        else:
+            budgetDetails=createBudget(data,request,userName,accountId)
+        return JsonResponse(budgetDetails)
+    except Exception as E:
+        logger.warning("getBudget-"+str(datetime.datetime.now()))
+        logger.warning(E)
+        print(E)
+
+
+def createBudget(data,request,userName,accountId):
+    """
+        This creates the budget.
+        Input:
+        data: data to create budget
+        accountId: id of the account
+    """
+    try:
+        snsARN = createSNSNotification(userName)
+        response = budgetClient.create_budget(
+                    AccountId=accountId,
+                    Budget={
+                        'BudgetName': userName.split('.')[0]+"'s "+ configdata["environment"] +" Monthly Budget",
+                        'BudgetLimit': {
+                            'Amount': data["BudgetParameters"]["BudgetLimit"],
+                            'Unit': 'USD'
+                        },
+                        'CostFilters': {'Service': ['Amazon Elastic Compute Cloud - Compute', 'EC2-Other', 'FSx'], 'TagKeyValue': ['user:CREATEDBY$'+userName,'user:Environment$'+configdata["environment"]]},
+                        'CostTypes': {
+                            'IncludeTax': True,
+                            'IncludeSubscription': True,
+                            'UseBlended': False,
+                            'IncludeRecurring':True
+                        },
+                        'TimeUnit': data["BudgetParameters"]["TimeUnit"],
+                        'TimePeriod': {
+                            'Start': datetime.datetime(datetime.date.today().year, datetime.date.today().month, datetime.date.today().day),
+
+                        },
+                        'CalculatedSpend': {
+                            'ActualSpend': {
+                                'Amount': '1.75',
+                                'Unit': 'USD'
+                            },
+                            'ForecastedSpend': {
+                                'Amount': '1.75',
+                                'Unit': 'USD'
+                            }
+                        },
+                        'BudgetType': 'COST'
+                    },
+                    NotificationsWithSubscribers=[
+                    {
+                        'Notification': {
+                            'NotificationType': 'ACTUAL',
+                            'ComparisonOperator': 'GREATER_THAN',
+                            'Threshold': 90
+                        },
+                        'Subscribers': [
+                                            {
+                                                "SubscriptionType": "EMAIL",
+                                                "Address": userName
+                                            },
+                                            {
+                                                'SubscriptionType': 'SNS',
+                                                'Address': snsARN["SNSTopicUser"]
+                                            }
+                                        ]
+                    },
+                    {
+                        'Notification': {
+                            'NotificationType': 'ACTUAL',
+                            'ComparisonOperator': 'GREATER_THAN',
+                            'Threshold': 70
+                        },
+                        'Subscribers': [
+                                            {
+                                                "SubscriptionType": "EMAIL",
+                                                "Address": userName
+                                            },
+                                            {
+                                                'SubscriptionType': 'SNS',
+                                                'Address': snsARN["SNSTopicUser"]
+                                            }
+                                        ]
+                    }
+                    ]
+                )
+        budgetDetails = {}
+        budgetDetails["snsCreated"] = True
+        if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
+            response = budgetClient.describe_budgets(AccountId=accountId, MaxResults= 99)
+            fileOpen = open('../django_forms/staticfiles/assets/Json/createBudget.json')
+            data = json.load(fileOpen)
+            budgetLimit = data["BudgetParameters"]["BudgetLimit"]
+            calculatedSpend = 0
+            forecastedSpend = 0
+            if "Budgets" in response.keys():
+                currentBudget=[i for i in response["Budgets"] if i['BudgetName'] == userName.split('.')[0]+"'s "+ configdata["environment"] +" Monthly Budget"]
+                if len(currentBudget) > 0:
+                    if 'CalculatedSpend' in currentBudget[0].keys():
+                        budgetLimit = int(round(float(currentBudget[0]['BudgetLimit']['Amount']),0))
+                        calculatedSpend = int(round(float(currentBudget[0]['CalculatedSpend']['ActualSpend']['Amount']),0))
+                        if "ForecastedSpend" in currentBudget[0]['CalculatedSpend'].keys():
+                            forecastedSpend = int(round(float(currentBudget[0]['CalculatedSpend']['ForecastedSpend']['Amount'],0)))
+                        budgetDetails["budgetLimt"] = budgetLimit
+                        budgetDetails["calculatesSpend"] = calculatedSpend
+                        budgetDetails["forecastedSpend"] = forecastedSpend
+            return budgetDetails
+    except Exception as E:
+        logger.warning("createBudget-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+def createSNSNotification(userName):
+    try:
+        snsDetails = snsexist(userName)
+        if snsDetails["snsExists"] == False:
+            numenSNS=customerprefix+'sns-'+userName.split('@')[0]
+            numenSNS=numenSNS.replace('.','-')
+            snsresponse = snsClient.create_topic(
+                Name=numenSNS,
+                Attributes={
+                    'DisplayName': numenSNS
+                },
+            )
+            if snsresponse["ResponseMetadata"]["HTTPStatusCode"] == 200:
+                response = snsClient.subscribe(
+                            TopicArn=snsresponse["TopicArn"],
+                            Protocol='email',
+                            Endpoint= userName,
+                            ReturnSubscriptionArn=True
+                        )
+                snsDetails["SNSTopicUser"] = snsresponse["TopicArn"]
+        return snsDetails
+    except Exception as E:
+        logger.warning("createSNSNotification-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+
+def snsexist(userName):
+    try:
+        snsDetails = {}
+        response = snsClient.list_topics()
+        describe_result = response["Topics"]
+        accountId=stsClient.get_caller_identity()["Account"]
+        while "NextToken" in response:
+            response = snsClient.list_topics(NextToken=response["NextToken"])
+            describe_result.extend(response["Topics"])
+        print(describe_result)
+        topicArn = 'arn:aws:sns:'+region_name+':'+accountId+':'+ customerprefix +'sns-'+userName.split('@')[0].replace('.','-')
+        response = [i["TopicArn"] for i in describe_result if i["TopicArn"] == topicArn]
+        if len(response) > 0 :
+            snsDetails["snsExists"] = True
+            snsDetails["SNSTopicUser"] = response[0]
+            return snsDetails
+        else:
+            snsDetails["snsExists"] = False
+            return snsDetails
+    except Exception as E:
+        logger.warning("createSNSNotification-"+str(datetime.datetime.now()))
+        logger.warning(E)
+        print("createSNS",E)
+
+@csrf_exempt
+def withoutCodeBuild(request):
+    try:
+        body= json.loads(request.body)
+        stackName=body["applicationName"].replace('.','-') +"-"+ body["os"].replace('.','-') +"-"+ idPrefix + getUniqId(4)
+        body["stackName"] = stackName
+        stackID = getStackId()
+        body["stackID"] = stackID
+        FileSystem = ""
+        if len(body["volumes"]) > 0:
+                fsxSize = [i["size"] for i in body["volumes"] if i["type"] == "FSX"]
+                if len(fsxSize) > 0:
+                    FileSystem = fsxSize[0]
+                    fsxfilesystemID = createFsxForInstance(body,fsxSize[0],stackName,str(stackID))
+                #body["ondemandFSXfsid"] = fsxfilesystemID
+        if body["clusterType"] == "SINGLE":
+            parameterObj = {}
+            buildParameters=launchSingleNode(body)
+            print(buildParameters)
+            if "alinux" in body["os"]:
+                buildParameters["EBSROOTDEVNAME"] = "/dev/xvda"
+            parametersIns = []
+            for key,value in buildParameters.items():
+                        parametersIns.append({
+                                'ParameterKey': key,
+                                'ParameterValue': value
+                        })
+            instancetags = [
+                        {'Key': 'Platform','Value': 'Numen'},
+                        {'Key': 'CREATEDBY','Value': body["email"]},
+                        {'Key':'RESOURCEBUCKET','Value': buildData["singleNode"]['Bucket']},
+                        {'Key': 'IdleStop','Value': str(body["idleTimeout"]["value"])},
+                        {'Key': 'CUSTOMNAME','Value':buildParameters["ResId"]},
+                        {'Key': 'Environment','Value':configdata["environment"]}
+                    ]
+            parameterObj["stackName"] = configdata["snstackprefix"] + str(stackID)
+            parameterObj["InstanceTags"] = instancetags
+            parameterObj["envVariables"]=parametersIns
+            response = singleNodeBuild(parameterObj,body["os"])
+            responseObject = {
+                "status":response["StackId"]
+            }
+            return JsonResponse(responseObject)
+        else:
+
+            envvalues= launchParallelCluster(body)
+            if FileSystem !="":
+                envvalues["FILESYSTEM"] = "FSX:"+ str(FileSystem)
+            stackName = configdata["pcstackprefix"] + str(stackID)
+            rc= parallelNodeBuild(envvalues,stackName)
+            responseObject = {
+                "status": rc
+            }
+        return JsonResponse(responseObject)
+    except Exception as E:
+        print(E)
+        logger.warning("withoutCodeBuild-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+
+
+def getStackId():
+     try:
+        stackID = 000
+        if(len(instanceData["instanceID"]) < 999):
+            stackID = len(instanceData["instanceID"])+1
+            stackID = "{:03d}".format(stackID)
+            if checkStackId(stackID):
+                stackID = stackID
+            else:
+                stackID = len(instanceData["instanceID"])+2
+                stackID = "{:03d}".format(stackID)
+            instanceData["instanceID"].append(stackID)
+            with open("staticfiles/assets/Json/instanceCount.json","w") as outfile:
+                json.dump(instanceData, outfile,default=str)
+        return stackID
+     except Exception as E:
+        logger.warning("getStackId-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+def checkStackId(stackID):
+    try:
+        response = cfnclient.list_stacks()
+        stackSummary = response["StackSummaries"]
+        stackName =  "NUMEN-"+stackID
+        while "NextToken" in response:
+            response = cfnclient.list_stacks(NextToken=response["NextToken"])
+            stackSummary.extend(response["StackSummaries"])
+        stackListName = [item["StackName"] for item in stackSummary if stackName.lower() in item["StackName"].lower()]
+        if len(stackListName) > 0 :
+            return False
+        else:
+            return True
+    except Exception as E:
+        print(E)
+
+
+
+def launchSingleNode(body):
+    try:
+        Packages=body["applicationName"]
+        if body["os"] != "windows":
+            buildParameters= buildData["singleNode"]
+            buildParameters["PACKAGES"] = Packages
+            buildParameters["instancename"] = configdata["instanceidprefix"]+ str(body["stackID"])
+        else:
+            buildParameters= buildData["sNwindows"]
+            buildParameters["instancename"] = configdata["instanceidprefix"]+str(body["stackID"])
+        resId = "sn-" + body["stackName"]
+        buildParameters["ResId"] = resId
+        buildParameters["ImageId"]= getCustomAMI(body["os"])
+        if len(body["volumes"]) > 0:
+            ebsSize = [i["size"] for i in body["volumes"] if i["type"] == "EBS"]
+            if(len(ebsSize)) > 0:
+                buildParameters["EBSROOTVOLSIZE"] = str(ebsSize[0])
+            fsxSize = [i["size"] for i in body["volumes"] if i["type"] == "FSX"]
+            if(len(fsxSize)) > 0:
+                buildParameters["fsxStorageCapacity"] = str(fsxSize[0])
+        buildParameters["InstanceType"] = body["nodes"][0]["code"]
+        return buildParameters
+    except Exception as E:
+        logger.warning("launchSingleNode-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+def singleNodeBuild(parameters,os):
+    try:
+        if os != "windows":
+            with open('staticfiles/assets/Json/ctx-numen-singlenode-template.yml', 'r') as f:
+                template_body = f.read()
+        else:
+            with open('staticfiles/assets/Json/ctx-numen-singlenode-windows-template.yml', 'r') as f:
+                template_body = f.read()
+        response = cfnclient.create_stack(
+            StackName=parameters["stackName"],
+            TemplateBody=template_body,
+            Parameters=  parameters["envVariables"],
+            Tags= parameters["InstanceTags"]
+        )
+        return response
+    except Exception as E:
+        logger.warning("singleNodeBuild-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+
+def launchParallelCluster(body):
+    try:
+        buildParameters= buildData["parallelCluster"]
+        Packages=body["applicationName"]
+        os = body["os"]
+        #buildParameters["CUSTOMAMI"] = getCustomAMI(Packages,body["os"])
+        buildParameters["CUSTOMAMI"] = getCustomAMI(body["os"])
+        clusterName = body["stackName"]
+        buildParameters["MASTERNODETYPE"] = body["nodes"][0]["code"]
+        buildParameters["CLUSTERNAME"] = clusterName
+        buildParameters["CUSTOMNAME"] = clusterName
+        buildParameters["PACKAGES"] = Packages
+        buildParameters["IDLETIME"] = str(body["idleTimeout"]["value"])
+        buildParameters["ENVIRONMENT"] = configdata["environment"]
+        slurmQueues = []
+        for x,i in enumerate(body["nodeGroups"]):
+            if i["code"].split('-')[0] == "cpu":
+                instn = getInstances(i["code"])
+            elif i["code"].split('-')[0] == "gpu":
+                instn = getInstancesGPU(i["code"])
+            #else:
+            #    instn = getInstancesGPU(i["code"])
+            slurmQueues.append(i["code"])
+            buildParameters["PART"+str(x+1)+"_TYPE"]=instn
+            buildParameters["PART"+str(x+1)+"_NAME"]=i["code"]
+            buildParameters["PART"+str(x +1)+"_MAXCOUNT"]=str(i["count"])
+        if len(body["volumes"]) > 0:
+            ebsSize = [i["size"] for i in body["volumes"] if i["type"] == "EBS"]
+            if(len(ebsSize)) > 0:
+                buildParameters["MASTERROOTVOLSIZE"] = str(ebsSize[0])
+                buildParameters["COMPUTEROOTVOLSIZE"] = str(ebsSize[0])
+        buildParameters["BASEOS"] = body["os"]
+        buildParameters["accountid"] = stsClient.get_caller_identity()["Account"]
+        buildParameters["CREATEDBY"] = body["email"]
+        buildParameters["SLURMQUEUES"] = ":".join(slurmQueues)
+        buildParameters["INSTANCENAME"]=configdata["instanceidprefix"]+ str(body["stackID"])
+        #buildParameters["ondemandFSXfsid"] = body["ondemandFSXfsid"]
+        return buildParameters
+    except Exception as E:
+        logger.warning("launchParallelCluster-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+def parallelNodeBuild(parameters,stackName):
+    try:
+        with open('staticfiles/assets/Json/pcluster.template.3.2.1.j2') as f:
+            templatedata=f.read()
+        template = Template(templatedata)
+        print(parameters)
+        config = template.render(env=parameters, name='pcluster')
+        with open('staticfiles/assets/pClusterConfigs/'+parameters["CLUSTERNAME"]+'.config', 'w') as f:
+            f.write(config)
+        process=subprocess.Popen(["aws", "s3", "sync" ,"s3://"+configdata["resourcebucket"]+"/pcluster/","s3://"+configdata["resourcebucket"]+"/parallelcluster-"+parameters["CLUSTERNAME"]+"/"], stdout=subprocess.PIPE)
+        rc = runSubprocess(parameters,stackName)
+        return rc
+    except Exception as E:
+        logger.warning("parallelNodeBuild-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+def runSubprocess(parameters,stackName):
+
+    try:
+        process=subprocess.Popen(["pcluster", "create-cluster", "-c" ,"staticfiles/assets/pClusterConfigs/"+parameters["CLUSTERNAME"]+".config","-n", stackName,"--rollback-on-failure","false"], stdout=subprocess.PIPE)
+        stackARN = ""
+        while True:
+            output = process.stdout.readline()
+            if output:
+                output = output.strip().decode()
+                logger.warning(output)
+                if "cloudformationStackStatus" in output:
+                    os.remove("staticfiles/assets/pClusterConfigs/"+parameters["CLUSTERNAME"]+".config")
+                    return output
+                    break
+    except Exception as E:
+        logger.warning("runSubprocess-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+def createFsxForInstance(parameters,fsxSize, stackname,stackID):
+    try:
+        if parameters["clusterType"] == "SINGLE":
+            stackname = "sn-"+ stackname
+        response = fsxClient.create_file_system(ClientRequestToken=str(uuid.uuid4()),FileSystemType='LUSTRE',StorageCapacity=fsxSize,SubnetIds=[configdata["mastersubnetid"]],SecurityGroupIds=[buildData["parallelCluster"]["ADDITIONALSECURITYGROUPID"]],Tags=[{'Key': 'Name', 'Value': configdata["fsxprefix"]},{'Key': 'FSXName', 'Value': stackname},{'Key': 'environment','Value':configdata["environment"]},{'Key': 'CREATEDBY','Value': parameters["email"]}],
+        FileSystemTypeVersion="2.12",LustreConfiguration={'DataCompressionType': 'LZ4','DeploymentType': "PERSISTENT_2",'PerUnitStorageThroughput': 125})
+        FileSystemId=response['FileSystem']['FileSystemId']
+        ondemandfsxstatus = ""
+        """ while [[ ondemandfsxstatus != 'AVAILABLE' ]]:
+            ondemandfsxstatus = fsxClient.describe_file_systems(
+                                FileSystemIds=[
+                                    FileSystemId,
+                                ],
+                            )
+            ondemandfsxstatus = ondemandfsxstatus["FileSystems"][0]['Lifecycle']
+            print(ondemandfsxstatus)
+            print("waiting for OndemandFSx to be available")
+            time.sleep(30) """
+        return FileSystemId
+    except Exception as E:
+        logger.warning("createFsxForInstance-"+str(datetime.datetime.now()))
+        logger.warning(E)
+
+def removeStackId(stackName):
+    try:
+        stackID = stackName.split("-")
+        stackID = stackID[-1]
+        stackID = "{:03d}".format(int(stackID))
+        instanceData["instanceID"].remove(stackID)
+        with open("staticfiles/assets/Json/instanceCount.json","w") as outfile:
+            json.dump(instanceData, outfile,default=str)
+    except Exception as E:
+        logger.warning("createFsxForInstance-"+str(datetime.datetime.now()))
+        logger.warning(E)

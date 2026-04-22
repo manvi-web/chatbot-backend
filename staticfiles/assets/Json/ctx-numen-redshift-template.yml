@@ -1,0 +1,154 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: NUMEN - Amazon Redshift Data Warehouse Cluster
+
+Parameters:
+  ClusterIdentifier:
+    Type: String
+    Description: Unique identifier for the Redshift cluster
+    MaxLength: 63
+
+  NodeType:
+    Type: String
+    Description: Node type for the cluster
+    Default: ra3.large
+    AllowedValues:
+      - ra3.large
+      - ra3.xlplus
+      - ra3.4xlarge
+      - ra3.16xlarge
+
+  ClusterType:
+    Type: String
+    Description: Cluster type
+    Default: multi-node
+    AllowedValues: [single-node, multi-node]
+
+  NumberOfNodes:
+    Type: Number
+    Description: Number of compute nodes (ignored for single-node)
+    Default: 2
+    MinValue: 1
+    MaxValue: 128
+
+  DBName:
+    Type: String
+    Description: Database name for the cluster
+    Default: numendw
+    MaxLength: 64
+
+  MasterUsername:
+    Type: String
+    Description: Master user for the cluster
+    Default: admin
+    NoEcho: false
+
+  MasterUserPassword:
+    Type: String
+    Description: Master user password
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 64
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID for the cluster
+
+  SubnetId1:
+    Type: AWS::EC2::Subnet::Id
+    Description: First subnet for cluster subnet group
+
+  SubnetId2:
+    Type: AWS::EC2::Subnet::Id
+    Description: Second subnet for cluster subnet group
+
+  VpcSecurityGroupId:
+    Type: String
+    Description: Security group for the cluster
+
+  AutomatedSnapshotRetentionPeriod:
+    Type: Number
+    Description: Days to retain automated snapshots
+    Default: 7
+    MinValue: 0
+    MaxValue: 35
+
+  CREATEDBY:
+    Type: String
+    Description: User who created the cluster
+    Default: numen-user
+
+  Environment:
+    Type: String
+    Description: Deployment environment
+    Default: dev
+
+Conditions:
+  IsMultiNode: !Equals [!Ref ClusterType, 'multi-node']
+
+Resources:
+  RedshiftSubnetGroup:
+    Type: AWS::Redshift::ClusterSubnetGroup
+    Properties:
+      Description: !Sub "NUMEN Redshift Subnet Group for ${ClusterIdentifier}"
+      SubnetIds:
+        - !Ref SubnetId1
+        - !Ref SubnetId2
+      Tags:
+        - Key: Name
+          Value: !Sub "numen-redshift-subnet-${ClusterIdentifier}"
+        - Key: Platform
+          Value: Numen
+        - Key: Environment
+          Value: !Ref Environment
+
+  RedshiftCluster:
+    Type: AWS::Redshift::Cluster
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      ClusterIdentifier: !Ref ClusterIdentifier
+      ClusterType: !Ref ClusterType
+      NodeType: !Ref NodeType
+      NumberOfNodes: !If [IsMultiNode, !Ref NumberOfNodes, !Ref AWS::NoValue]
+      DBName: !Ref DBName
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterUserPassword
+      ClusterSubnetGroupName: !Ref RedshiftSubnetGroup
+      VpcSecurityGroupIds:
+        - !Ref VpcSecurityGroupId
+      Encrypted: true
+      AutomatedSnapshotRetentionPeriod: !Ref AutomatedSnapshotRetentionPeriod
+      PubliclyAccessible: false
+      EnhancedVpcRouting: true
+      Tags:
+        - Key: Platform
+          Value: Numen
+        - Key: CREATEDBY
+          Value: !Ref CREATEDBY
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Name
+          Value: !Ref ClusterIdentifier
+
+Outputs:
+  ClusterEndpoint:
+    Description: Redshift Cluster Endpoint Address
+    Value: !GetAtt RedshiftCluster.Endpoint.Address
+    Export:
+      Name: !Sub "${AWS::StackName}-ClusterEndpoint"
+
+  ClusterPort:
+    Description: Redshift Cluster Port
+    Value: !GetAtt RedshiftCluster.Endpoint.Port
+    Export:
+      Name: !Sub "${AWS::StackName}-ClusterPort"
+
+  ClusterId:
+    Description: Redshift Cluster Identifier
+    Value: !Ref RedshiftCluster
+    Export:
+      Name: !Sub "${AWS::StackName}-ClusterId"
+
+  ClusterSubnetGroupName:
+    Description: Redshift Cluster Subnet Group
+    Value: !Ref RedshiftSubnetGroup

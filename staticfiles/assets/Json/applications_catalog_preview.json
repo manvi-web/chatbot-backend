@@ -1,0 +1,446 @@
+{
+    "_meta": {
+        "description": "Preview schema for 12 Life Sciences Research Workbench catalog templates. All entries have implemented:false until CFN templates and AMIs are ready. Do NOT merge into applications.json until Phase 1 sign-off.",
+        "source": "life_sciences_research_workbench_catalog_latest.xlsx",
+        "generatedDate": "2026-04-14",
+        "rollbackTag": "v1.7.3_PK-pre-catalog",
+        "rollbackCommand": "git checkout v1.7.3_PK-pre-catalog -- webapp/codedeploy/be/django_forms/staticfiles/assets/Json/applications.json",
+        "phases": {
+            "phase1": ["genomics-cli", "biostatistics", "collab-data-science", "imaging-desktop"],
+            "phase2": ["rna-seq-analysis", "workflow-builder", "single-cell-cpu", "proteomics-stack"],
+            "phase3": ["single-cell-gpu", "digital-pathology", "structural-biology", "cheminformatics"]
+        }
+    },
+
+    "CatalogTemplates": [
+
+        {
+            "_phase": 1,
+            "_comment": "PHASE 1 — open-source, Linux, no GPU. Maps directly to existing SingleNode/parallelCluster launch flow.",
+
+            "title": "Genomics CLI",
+            "imgName": "genomics-cli.svg",
+            "packageName": "genomicsCli",
+            "licenced": false,
+            "description": "End-to-end NGS analysis stack: QC, alignment, variant calling, and annotation. Includes FastQC, MultiQC, BWA, minimap2, GATK, samtools, bcftools, BEDTools, Cutadapt, and IGV.",
+            "version": "2024",
+            "cost": "$149",
+            "compatibleOS": [
+                "Alinux2",
+                "Ubuntu2004"
+            ],
+            "compatibleInfra": [
+                "SingleNode",
+                "parallelCluster"
+            ],
+            "compatibleDS": [
+                "Home",
+                "CryoEMProjects"
+            ],
+            "implemented": false,
+            "disableCPU": false,
+            "disableGPU": true,
+            "_icons_needed": ["genomics-cli.svg"],
+            "_ec2_profile": "m7i.2xlarge (interactive) / r7i.4xlarge (high-memory jobs)",
+            "_apps_included": ["FastQC", "MultiQC", "Cutadapt", "BWA", "minimap2", "samtools", "bcftools", "BEDTools", "GATK", "IGV"]
+        },
+
+        {
+            "_phase": 1,
+            "_comment": "PHASE 1 — open-source, Linux/Windows, no GPU. Desktop + notebook. Lightest compute profile.",
+
+            "title": "Biostatistics",
+            "imgName": "biostatistics.svg",
+            "packageName": "biostatistics",
+            "licenced": false,
+            "description": "Reproducible statistics and data visualisation workbench. Includes R, Python, JupyterLab, RStudio Desktop, Bioconductor core packages, and Git.",
+            "version": "2024",
+            "cost": "$149",
+            "compatibleOS": [
+                "Alinux2",
+                "Ubuntu2004",
+                "Windows"
+            ],
+            "compatibleInfra": [
+                "SingleNode"
+            ],
+            "compatibleDS": [
+                "Home",
+                "CryoEMProjects"
+            ],
+            "implemented": false,
+            "disableCPU": false,
+            "disableGPU": true,
+            "_icons_needed": ["biostatistics.svg"],
+            "_ec2_profile": "m7i.xlarge or m7i.2xlarge",
+            "_apps_included": ["R", "Python", "JupyterLab", "RStudio Desktop", "Bioconductor core", "Git"]
+        },
+
+        {
+            "_phase": 1,
+            "_comment": "PHASE 1 — open-source, Linux, optional GPU. Shared notebook workbench — broadest appeal.",
+
+            "title": "Collaborative Data Science",
+            "imgName": "collab-data-science.svg",
+            "packageName": "collabDataScience",
+            "licenced": false,
+            "description": "Shared notebook and exploratory analysis environment. Includes JupyterLab, Python, R, Git, VS Code, and Conda/Mamba. Suits any researcher needing interactive compute.",
+            "version": "2024",
+            "cost": "$149",
+            "compatibleOS": [
+                "Alinux2",
+                "Ubuntu2004"
+            ],
+            "compatibleInfra": [
+                "SingleNode",
+                "parallelCluster"
+            ],
+            "compatibleDS": [
+                "Home",
+                "CryoEMProjects"
+            ],
+            "implemented": false,
+            "disableCPU": false,
+            "disableGPU": false,
+            "_icons_needed": ["collab-data-science.svg"],
+            "_ec2_profile": "m7i.xlarge (CPU) / g5.xlarge (GPU optional)",
+            "_apps_included": ["JupyterLab", "Python", "R", "Git", "VS Code", "Conda", "Mamba"]
+        },
+
+        {
+            "_phase": 1,
+            "_comment": "PHASE 1 — mostly open-source, Linux/Windows, optional GPU. Desktop mode via DCV.",
+
+            "title": "Imaging Desktop",
+            "imgName": "imaging-desktop.svg",
+            "packageName": "imagingDesktop",
+            "licenced": false,
+            "description": "Microscopy and bioimage analysis workbench delivered as a virtual desktop. Includes Fiji/ImageJ, napari, CellProfiler, QuPath, and ilastik.",
+            "version": "2024",
+            "cost": "$149",
+            "compatibleOS": [
+                "Alinux2",
+                "Ubuntu2004",
+                "Windows"
+            ],
+            "compatibleInfra": [
+                "SingleNode"
+            ],
+            "compatibleDS": [
+                "Home",
+                "CryoEMProjects"
+            ],
+            "implemented": false,
+            "disableCPU": false,
+            "disableGPU": false,
+            "_icons_needed": ["imaging-desktop.svg"],
+            "_ec2_profile": "m7i.2xlarge (CPU) / g4dn.xlarge or g5.xlarge (GPU optional)",
+            "_apps_included": ["Fiji/ImageJ", "napari", "CellProfiler", "QuPath", "ilastik"]
+        },
+
+        {
+            "_phase": 2,
+            "_comment": "PHASE 2 — open-source, Linux, no GPU. High-memory r7i nodes for STAR alignment.",
+
+            "title": "RNA-seq Analysis",
+            "imgName": "rna-seq.svg",
+            "packageName": "rnaSeqAnalysis",
+            "licenced": false,
+            "description": "Complete RNA-seq pipeline from QC to differential expression. Includes STAR, HISAT2, Salmon, Kallisto, featureCounts, HTSeq, samtools, R, Python, and JupyterLab.",
+            "version": "2024",
+            "cost": "$375",
+            "compatibleOS": [
+                "Alinux2",
+                "Ubuntu2004"
+            ],
+            "compatibleInfra": [
+                "SingleNode",
+                "parallelCluster"
+            ],
+            "compatibleDS": [
+                "Home",
+                "CryoEMProjects"
+            ],
+            "implemented": false,
+            "disableCPU": false,
+            "disableGPU": true,
+            "_icons_needed": ["rna-seq.svg"],
+            "_ec2_profile": "r7i.2xlarge (interactive) / r7i.4xlarge–r7i.8xlarge (STAR alignment jobs)",
+            "_apps_included": ["FastQC", "MultiQC", "STAR", "HISAT2", "Salmon", "Kallisto", "featureCounts", "HTSeq", "samtools", "R", "Python", "JupyterLab"]
+        },
+
+        {
+            "_phase": 2,
+            "_comment": "PHASE 2 — open-source, Linux, no GPU. Pipeline authoring and reproducibility environment.",
+
+            "title": "Workflow Builder",
+            "imgName": "workflow-builder.svg",
+            "packageName": "workflowBuilder",
+            "licenced": false,
+            "description": "Pipeline authoring and reproducibility environment. Includes Nextflow, Snakemake, nf-core, CWLTool, Git, Apptainer, and Docker client tools.",
+            "version": "2024",
+            "cost": "$149",
+            "compatibleOS": [
+                "Alinux2",
+                "Ubuntu2004"
+            ],
+            "compatibleInfra": [
+                "SingleNode",
+                "parallelCluster"
+            ],
+            "compatibleDS": [
+                "Home",
+                "CryoEMProjects"
+            ],
+            "implemented": false,
+            "disableCPU": false,
+            "disableGPU": true,
+            "_icons_needed": ["workflow-builder.svg"],
+            "_ec2_profile": "m7i.xlarge (desktop/authoring) / c7i.2xlarge (orchestration nodes)",
+            "_apps_included": ["Nextflow", "Snakemake", "CWLTool", "nf-core", "Git", "Apptainer", "Docker"]
+        },
+
+        {
+            "_phase": 2,
+            "_comment": "PHASE 2 — open-source, Linux, high-memory. Notebook-first. CPU-only tier of single-cell.",
+
+            "title": "Single-cell Analysis (CPU)",
+            "imgName": "single-cell-cpu.svg",
+            "packageName": "singleCellCpu",
+            "licenced": false,
+            "description": "High-memory notebook environment for scRNA-seq, scATAC-seq, and trajectory analysis. Includes Seurat, Scanpy, Monocle 3, Signac, ArchR, Bioconductor single-cell packages, R, Python, and JupyterLab.",
+            "version": "2024",
+            "cost": "$375",
+            "compatibleOS": [
+                "Alinux2",
+                "Ubuntu2004"
+            ],
+            "compatibleInfra": [
+                "SingleNode",
+                "parallelCluster"
+            ],
+            "compatibleDS": [
+                "Home",
+                "CryoEMProjects"
+            ],
+            "implemented": false,
+            "disableCPU": false,
+            "disableGPU": true,
+            "_icons_needed": ["single-cell-cpu.svg"],
+            "_ec2_profile": "r7i.4xlarge or r7i.8xlarge (high-memory)",
+            "_apps_included": ["Seurat", "Scanpy", "Monocle 3", "Signac", "ArchR", "Bioconductor single-cell", "JupyterLab", "R", "Python"]
+        },
+
+        {
+            "_phase": 2,
+            "_comment": "PHASE 2 — open-source, Linux/Windows, no GPU. Desktop + CLI. Windows needed for Skyline.",
+
+            "title": "Proteomics Open Stack",
+            "imgName": "proteomics.svg",
+            "packageName": "proteomicsStack",
+            "licenced": false,
+            "description": "Open-source mass spectrometry analysis stack for DDA and DIA proteomics. Includes OpenMS, Skyline, DIA-NN, MSFragger, and FragPipe.",
+            "version": "2024",
+            "cost": "$149",
+            "compatibleOS": [
+                "Alinux2",
+                "Ubuntu2004",
+                "Windows"
+            ],
+            "compatibleInfra": [
+                "SingleNode"
+            ],
+            "compatibleDS": [
+                "Home",
+                "CryoEMProjects"
+            ],
+            "implemented": false,
+            "disableCPU": false,
+            "disableGPU": true,
+            "_icons_needed": ["proteomics.svg"],
+            "_ec2_profile": "m7i.2xlarge or r7i.2xlarge (high-memory for large raw files)",
+            "_apps_included": ["OpenMS", "Skyline", "DIA-NN", "MSFragger", "FragPipe"]
+        },
+
+        {
+            "_phase": 3,
+            "_comment": "PHASE 3 — open-source, Linux, GPU preferred. scVI deep learning models require GPU.",
+
+            "title": "Single-cell Analysis (GPU)",
+            "imgName": "single-cell-gpu.svg",
+            "packageName": "singleCellGpu",
+            "licenced": false,
+            "description": "GPU-accelerated single-cell analysis for deep generative modelling. Includes scVI-tools, Scanpy, PyTorch, JupyterLab, Python, and optional Seurat via R.",
+            "version": "2024",
+            "cost": "$899",
+            "compatibleOS": [
+                "Alinux2",
+                "Ubuntu2004"
+            ],
+            "compatibleInfra": [
+                "SingleNode",
+                "parallelCluster"
+            ],
+            "compatibleDS": [
+                "Home",
+                "CryoEMProjects"
+            ],
+            "implemented": false,
+            "disableCPU": true,
+            "disableGPU": false,
+            "_icons_needed": ["single-cell-gpu.svg"],
+            "_ec2_profile": "g5.2xlarge or g5.4xlarge (GPU-backed notebook)",
+            "_apps_included": ["scVI-tools", "Scanpy", "PyTorch", "JupyterLab", "Python", "Seurat (optional)"]
+        },
+
+        {
+            "_phase": 3,
+            "_comment": "PHASE 3 — mostly open-source, Linux/Windows, optional GPU. High-memory for large whole-slide images.",
+
+            "title": "Digital Pathology",
+            "imgName": "digital-pathology.svg",
+            "packageName": "digitalPathology",
+            "licenced": false,
+            "description": "Whole-slide image analysis workbench delivered as a virtual desktop. Includes QuPath, Fiji/ImageJ, napari, Python, and JupyterLab. Supports large tiled image formats.",
+            "version": "2024",
+            "cost": "$375",
+            "compatibleOS": [
+                "Alinux2",
+                "Ubuntu2004",
+                "Windows"
+            ],
+            "compatibleInfra": [
+                "SingleNode"
+            ],
+            "compatibleDS": [
+                "Home",
+                "CryoEMProjects"
+            ],
+            "implemented": false,
+            "disableCPU": false,
+            "disableGPU": false,
+            "_icons_needed": ["digital-pathology.svg"],
+            "_ec2_profile": "r7i.2xlarge (large slides CPU) / g5.2xlarge (GPU-accelerated inference)",
+            "_apps_included": ["QuPath", "Fiji/ImageJ", "napari", "Python", "JupyterLab"]
+        },
+
+        {
+            "_phase": 3,
+            "_comment": "PHASE 3 — mostly open-source, Linux, optional GPU. Combines desktop visualisation with HPC batch simulation.",
+
+            "title": "Structural Biology",
+            "imgName": "structural-biology.svg",
+            "packageName": "structuralBiology",
+            "licenced": false,
+            "description": "Protein structure visualisation and molecular dynamics simulation. Includes PyMOL, UCSF ChimeraX, VMD, GROMACS, NAMD, Rosetta, and AlphaFold local toolchains.",
+            "version": "2024",
+            "cost": "$749",
+            "compatibleOS": [
+                "Alinux2",
+                "Ubuntu2004"
+            ],
+            "compatibleInfra": [
+                "SingleNode",
+                "parallelCluster"
+            ],
+            "compatibleDS": [
+                "Home",
+                "CryoEMProjects"
+            ],
+            "implemented": false,
+            "disableCPU": false,
+            "disableGPU": false,
+            "_icons_needed": ["structural-biology.svg"],
+            "_ec2_profile": "g5.2xlarge (visualisation) / c7i.8xlarge or hpc7g (CPU simulation) / g5.12xlarge (GPU MD)",
+            "_apps_included": ["PyMOL", "UCSF ChimeraX", "VMD", "GROMACS", "NAMD", "Rosetta", "AlphaFold toolchain"]
+        },
+
+        {
+            "_phase": 3,
+            "_comment": "PHASE 3 — open-source, Linux/Windows, no GPU. Notebook + CLI + desktop for computational chemistry.",
+
+            "title": "Cheminformatics",
+            "imgName": "cheminformatics.svg",
+            "packageName": "cheminformatics",
+            "licenced": false,
+            "description": "Computational chemistry and molecular data science workbench. Includes RDKit, KNIME Analytics Platform, Open Babel, AutoDock, AutoDock Vina, Python, and JupyterLab.",
+            "version": "2024",
+            "cost": "$149",
+            "compatibleOS": [
+                "Alinux2",
+                "Ubuntu2004",
+                "Windows"
+            ],
+            "compatibleInfra": [
+                "SingleNode"
+            ],
+            "compatibleDS": [
+                "Home",
+                "CryoEMProjects"
+            ],
+            "implemented": false,
+            "disableCPU": false,
+            "disableGPU": true,
+            "_icons_needed": ["cheminformatics.svg"],
+            "_ec2_profile": "m7i.xlarge or c7i.xlarge",
+            "_apps_included": ["RDKit", "KNIME Analytics Platform", "Open Babel", "AutoDock", "AutoDock Vina", "Python", "JupyterLab"]
+        }
+
+    ],
+
+    "_icons_summary": {
+        "needed": [
+            "genomics-cli.svg",
+            "biostatistics.svg",
+            "collab-data-science.svg",
+            "imaging-desktop.svg",
+            "rna-seq.svg",
+            "workflow-builder.svg",
+            "single-cell-cpu.svg",
+            "proteomics.svg",
+            "single-cell-gpu.svg",
+            "digital-pathology.svg",
+            "structural-biology.svg",
+            "cheminformatics.svg"
+        ],
+        "destination": "webapp/codedeploy/fe/public/media/",
+        "format": "SVG preferred (matches rds.svg, redshift.svg, sagemaker.svg pattern)"
+    },
+
+    "_infra_gaps": {
+        "note": "All 12 templates use existing SingleNode and/or parallelCluster infra types. No new infra types required for Phase 1-3.",
+        "new_ec2_profiles_needed": [
+            "r7i family (high-memory) — not yet in instance selection list",
+            "g5 family (GPU) — check if already covered by existing GPU instance options",
+            "c7i family (compute) — verify availability in current region"
+        ]
+    },
+
+    "_datasource_gaps": {
+        "note": "New templates mapped to existing Home and CryoEMProjects DataSources as a placeholder. A GenomicsData and LifeSciData source should be added to the DataSources array before Phase 1 launch for cleaner UX.",
+        "suggested_new_entries": [
+            {
+                "title": "Genomics Data",
+                "imgName": "genomics-data.svg",
+                "packageName": "GenomicsData",
+                "description": "Reference genomes, annotation databases, and sequencing project data for genomics workloads."
+            },
+            {
+                "title": "Life Sciences Projects",
+                "imgName": "lifesci-projects.svg",
+                "packageName": "LifeSciProjects",
+                "description": "Shared project storage for life sciences research workbench templates."
+            }
+        ]
+    },
+
+    "_cost_basis": {
+        "note": "Cost field shows estimated monthly instance cost based on AWS Infra BOM recommended EC2 profiles. Actual cost depends on hours used. Values are indicative and should be replaced with live pricing from AWS Pricing API before Phase 1 launch.",
+        "mapping": {
+            "$149": "m7i.xlarge ~$0.2016/hr × 730h",
+            "$375": "r7i.2xlarge ~$0.504/hr × 730h",
+            "$749": "r7i.4xlarge ~$1.008/hr × 730h",
+            "$899": "g5.2xlarge ~$1.212/hr × 730h"
+        }
+    }
+}

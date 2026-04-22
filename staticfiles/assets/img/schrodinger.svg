@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Schrödinger: purple/violet, Maestro-style docking pose -->
+  <defs>
+    <radialGradient id="sg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#4c1d95"/>
+    </radialGradient>
+  </defs>
+  <!-- Receptor pocket surface -->
+  <path d="M6 38 Q10 28 18 24 Q24 20 30 22 Q38 24 42 34 L42 42 Q32 44 24 44 Q12 44 6 42 Z" fill="#4c1d95" opacity="0.15"/>
+  <path d="M10 36 Q14 28 20 25 Q26 22 32 24 Q38 26 40 34" stroke="#6d28d9" stroke-width="1.5" fill="none" stroke-dasharray="3 2"/>
+  <!-- Ligand in pocket -->
+  <!-- Ring system -->
+  <polygon points="24,14 29,17 29,23 24,26 19,23 19,17" stroke="#7c3aed" stroke-width="2" fill="#ede9fe" opacity="0.9"/>
+  <!-- Substituents -->
+  <line x1="29" y1="17" x2="36" y2="13" stroke="#7c3aed" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="37" cy="12" r="2.5" fill="url(#sg)"/>
+  <line x1="19" y1="17" x2="12" y2="13" stroke="#7c3aed" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="11" cy="12" r="2.5" fill="#a78bfa"/>
+  <line x1="24" y1="26" x2="24" y2="33" stroke="#7c3aed" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="24" cy="34" r="2.5" fill="url(#sg)"/>
+  <!-- Central ring fill -->
+  <circle cx="24" cy="20" r="2" fill="#7c3aed"/>
+</svg>

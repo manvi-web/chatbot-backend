@@ -1,0 +1,29 @@
+{
+  "templates": [
+    {
+      "id": "1",
+      "name": "ctx-Numen",
+      "templateData": [
+        {
+          "applicationName": "Linux",
+          "operatingSystem": "Ubuntu2004",
+          "dataSources": ["Projects", "Home", "Data"],
+          "infrastructure": "SingleNode",
+          "Machine": "m6i.xlarge",
+          "IDLETERMINATION": "30",
+          "cost": "$138"
+        },
+        {
+          "applicationName": "Relion",
+          "operatingSystem": "Ubuntu2004",
+          "dataSources": ["Projects", "Home", "Data"],
+          "infrastructure": "SingleNode",
+          "Machine": "m6i.2xlarge",
+          "IDLETERMINATION": "30",
+          "cost": "$1169"
+        }
+      ]
+    }
+  ]
+}
+

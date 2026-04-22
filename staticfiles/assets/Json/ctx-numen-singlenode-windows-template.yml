@@ -1,0 +1,272 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Template to Create an EC2 instance winth Windows OS in a VPC
+
+Parameters:
+
+  ImageId:
+    Type: String
+    Description: Ami to Launch ec2 instance With
+  SubnetId:
+    Type: String
+    Description: Subnet in which to launch an EC2 and FSX
+  InstanceType:
+    Type: String
+    Description: aws Machine Type
+  KeyName:
+    Description: SSH Keypair to login to the instance
+    Type: String
+  ResId:
+    Description: Name for the ec2 instance
+    Type: String
+  IAMROLE:
+    Description: Iam role for the Single Node Resource Launch
+    Type: String
+  EBSROOTVOLSIZE:
+    Description: EBS Root volume Size
+    Type: String
+  EBSROOTDEVNAME:
+    Description: EBS Root volume Device Name
+    Type: String
+  fsxSecurityGroupId:
+    Type: String
+    Description: fsxSecurityGroupId Of FileSystem
+  instancename:
+    Type: String
+    Description: Instance Name configured from web Application
+  SelectedPackages:
+    Description: Comma-separated list of General Compute tools to install (e.g. Docker,Git,Python3)
+    Type: String
+    Default: ""
+
+
+Resources:
+  NumenInstance:
+    Type:   AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      PropagateTagsToVolumeOnCreation: 'true'
+      SecurityGroupIds:
+        - !Ref fsxSecurityGroupId
+      SubnetId: !Ref SubnetId
+      IamInstanceProfile: !Ref IAMROLE
+      BlockDeviceMappings:
+        - DeviceName: !Ref EBSROOTDEVNAME
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: !Ref EBSROOTVOLSIZE
+            Encrypted: 'true'
+      Tags:
+        - Key: Name
+          Value: !Ref instancename
+        - Key: BootstrapStatus
+          Value: Incomplete
+      UserData:
+        Fn::Base64:
+          !Sub |
+          <powershell>
+          Write-Output "USERDATA BEGINS"
+          Import-Module -Name AWSPowerShell
+          $instanceId = Invoke-WebRequest -Uri http://169.254.169.254/latest/meta-data/instance-id -UseBasicParsing
+          $instance=Get-EC2Tag -Filter @{Name="resource-type";Values="instance"},@{Name="resource-id";Values=$instanceid}
+          $stackName=$instance | ? { $_.Key -eq "CUSTOMNAME" } | select -expand Value
+          Write-Output "$stackName"
+          $resourcebucket=$instance | ? { $_.Key -eq "RESOURCEBUCKET" } | select -expand Value
+          Write-Output "$resourcebucket"
+          $interface = Invoke-WebRequest -Uri http://169.254.169.254/latest/meta-data/network/interfaces/macs/ -UseBasicParsing
+          Write-Output "$interface"
+          $vpcid = Invoke-WebRequest -Uri http://169.254.169.254/latest/meta-data/network/interfaces/macs/$INTERFACE/vpc-id -UseBasicParsing
+          Write-Output "$vpcid"
+          Write-Output "Pulling S3 Scripts"
+          aws s3 sync s3://$resourcebucket/devops/warpm109/Windows/ C:\Numen\temp\ImageBuilder\
+          Write-Output "cloudwatch agent Installation begins"
+          wget  -O  "C:\Program Files\Amazon\amazon-cloudwatch-agent.msi" "https://amazoncloudwatch-agent.s3.amazonaws.com/windows/amd64/latest/amazon-cloudwatch-agent.msi"
+          sleep 3
+          cd 'C:\Program Files\Amazon\'
+          msiexec /i amazon-cloudwatch-agent.msi
+          sleep 5
+          & 'C:\Program Files\Amazon\AmazonCloudWatchAgent\amazon-cloudwatch-agent-ctl.ps1' -a fetch-config -m ec2 -s -c file:'C:\Numen\temp\ImageBuilder\cw_config_windows.json' > cw_install.log
+          sleep 2
+          Restart-Service -Name AmazonCloudWatchAgent
+          # Parameters Block #########################################################################################
+          Write-Output "warp Installation begins"
+          $url = "http://deployment.warpem.com/Warp_1.0.9.msi"
+          $dest = "C:\Numen\temp\warp.msi"
+          $path = "C:\Numen\temp"
+          $ACLPath = "C:\Warp\"
+          $Identity = "structbio"
+          $FileSystemRight = "ReadAndExecute"
+          $Propagation = "3"
+          $inheritance = "3"
+          $RuleType = "Allow"
+          # Parameters Block #########################################################################################
+          If(!(test-path -PathType container $path))
+          {
+                Write-Output "Temporary Path Not Found !!! Creating temporary Numen path"
+                New-Item -ItemType Directory -Path $path
+          }
+          If(!(test-path -PathType Leaf $dest))
+          {
+                Write-Output "Temporary exec Not Found !!! Downloading exec for warp"
+                $ProgressPreference = 'SilentlyContinue'
+                Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
+          }
+          If(!(test-path -PathType container $ACLPath))
+          {
+                Write-Output "Warpem installation Path Not Found !!! Creating now."
+                New-Item -ItemType Directory -Path $ACLPath
+          }
+          Write-Output "Installing warp Now"
+          Start-Process msiexec -ArgumentList "/a $dest /quiet TARGETDIR=$ACLPath /passive /norestart /qn ALLUSERS=1 /l*v warp_install_msi.log" -Wait
+          Write-Output "Manage Dcv Script Invocation Starts"
+          python C:\Numen\temp\ImageBuilder\manage_dcv_listener.py $stackName $vpcid $resourcebucket
+          Write-Output "Closing the default Session for Console"
+          & "C:\Program Files\NICE\DCV\Server\bin\dcv.exe" close-session console
+          Write-Output "Setting Up Startup Script for Mounting fsxOpenzfs and symlinks"
+          python C:\Numen\temp\ImageBuilder\mount_fsx_ozfs.py $resourcebucket
+          Copy-Item -Path C:\Numen\temp\ImageBuilder\config_symlinks.bat -Destination "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\config_symlinks.bat"
+          Copy-Item -Path C:\Numen\temp\ImageBuilder\setup_usersettings.bat -Destination "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\setup_usersettings.bat"
+
+          Write-Output "Configuing ACL"
+          Try {
+              $ACL = Get-Acl -Path $ACLPath
+              $AccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($Identity,$FileSystemRight,$inheritance,$Propagation,$RuleType)
+              $ACL.SetAccessRule($AccessRule)
+              $ACL | Set-Acl -Path $ACLPath
+          }
+          Catch {
+              $ErrorMsg = $_.Exception.Message
+              Write-Host "Set folder permissions error: $ErrorMsg"
+          }
+          ###########################################################################################################
+          Write-Output "Add CREATEDBY Tag to EBS  root volume"
+          cd "C:\Numen\temp"
+          #$AWS_AVAIL_ZONE=(Invoke-WebRequest -Uri 'http://169.254.169.254/latest/meta-data/placement/availability-zone' -UseBasicParsing).Content
+          $REGION=(Invoke-WebRequest -Uri http://169.254.169.254/latest/dynamic/instance-identity/document -UseBasicParsing).content
+          $AWS_REGION=($REGION | ConvertFrom-Json).region
+          $AWS_INSTANCE_ID=(Invoke-WebRequest -Uri http://169.254.169.254/latest/meta-data/instance-id -UseBasicParsing)
+          $ROOT_VOLUME_IDS=$(aws ec2 describe-instances --region $AWS_REGION --instance-id $AWS_INSTANCE_ID --output text --query Reservations[0].Instances[0].BlockDeviceMappings[0].Ebs.VolumeId)
+          $TAG=(Get-EC2Tag -Filter @{Name="resource-type";Values="instance"},@{Name="resource-id";Values=$AWS_INSTANCE_ID})
+          #$TAG_VALUE=($TAG | ? { $_.Key -eq "CREATEDBY" } | select -expand Value)
+          #aws ec2 create-tags --resources $ROOT_VOLUME_IDS --region $AWS_REGION --tags Key=CREATEDBY,Value=$TAG_VALUE
+          $NAME_VALUE=($TAG | ? { $_.Key -eq "Name" } | select -expand Value)
+          $IDENTIFIER = $NAME_VALUE.Substring($NAME_VALUE.Length - 3)
+          aws s3 cp "s3://$resourcebucket/devops/config.json" "."
+          (Get-Content "config.json" | ForEach-Object { $_ -replace '^\s*"|\s*"\s*$', '' } | Where-Object { $_ -match '\S' }) | ForEach-Object { $line = $_ -replace '^ *\[ *| *\] *$', '' -replace '^export | export$|setenv ', '' -replace ',\s*$', '' -replace '"$', ''; if ($line -match '^(\S+?)=(.*)$') { "$($Matches[1])=$($Matches[2])" } } | Out-File "config.env"
+          Get-Content "config.env" | ForEach-Object { $name, $value = $_ -split '=', 2; Set-Variable -Name $name -Value $value }
+          $EBS_NAME = "$instanceidprefix" + 'W' + $IDENTIFIER + '-rfs'
+          aws ec2 create-tags --resources $ROOT_VOLUME_IDS --region $AWS_REGION --tags Key=Name,Value=$EBS_NAME
+          ############################################################################################################
+          Write-Output "Invoking idMapping Script"
+          python C:\Numen\temp\ImageBuilder\map_id.py
+          Write-Output "Setting Schedule for IdMap Task"
+          schtasks /Create /SC minute /mo 5 /RU system /TN NUMENUIDMAP /TR "C:\Python39\python.exe C:\Numen\temp\ImageBuilder\map_id.py"
+          Write-Output "Updating Warp gobal Settings"
+          powershell -File C:\Numen\temp\ImageBuilder\sync_settings.ps1
+          Write-Output "Updating BootStrap Status Tag"
+          $udStatus = New-Object Amazon.EC2.Model.Tag
+          $udStatus.Key = "BootstrapStatus"
+          $udStatus.Value = "completed"
+          New-EC2Tag -Resource $instanceId -Tag $udStatus
+
+          # ── Numen General Compute: install user-selected packages ───────────────
+          $NumenPkgs = "${SelectedPackages}"
+          if ($NumenPkgs -ne "") {
+            Write-Output "=== Numen package installer START: $NumenPkgs ==="
+
+            # Ensure Chocolatey is available
+            if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+              Write-Output ">>> Installing Chocolatey package manager"
+              Set-ExecutionPolicy Bypass -Scope Process -Force
+              [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+              Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+              $env:Path += ";C:\ProgramData\chocolatey\bin"
+            }
+
+            function Install-Docker {
+              Write-Output ">>> Installing Docker Desktop"
+              choco install docker-desktop -y --no-progress
+              Write-Output "Docker Desktop installation triggered"
+            }
+            function Install-VSCode {
+              Write-Output ">>> Installing VS Code"
+              choco install vscode -y --no-progress
+              Write-Output "VS Code installation triggered"
+            }
+            function Install-Mambaforge {
+              Write-Output ">>> Installing Mambaforge (mamba/conda)"
+              choco install mambaforge -y --no-progress
+              $env:Path += ";C:\ProgramData\mambaforge\Scripts"
+              Write-Output "Mambaforge installation triggered"
+            }
+            function Install-JupyterLab {
+              Write-Output ">>> Installing JupyterLab"
+              if (Get-Command mamba -ErrorAction SilentlyContinue) {
+                mamba install -y jupyterlab
+              } elseif (Get-Command conda -ErrorAction SilentlyContinue) {
+                conda install -y jupyterlab
+              } else {
+                pip install jupyterlab
+              }
+              Write-Output "JupyterLab installation triggered"
+            }
+            function Install-R {
+              Write-Output ">>> Installing R"
+              choco install r.project -y --no-progress
+              Write-Output "R installation triggered"
+            }
+            function Install-RStudio {
+              Write-Output ">>> Installing RStudio"
+              choco install r.studio -y --no-progress
+              Write-Output "RStudio installation triggered"
+            }
+            function Install-Git {
+              Write-Output ">>> Installing Git"
+              choco install git -y --no-progress
+              Write-Output "Git installed: $(git --version 2>&1)"
+            }
+            function Install-Python3 {
+              Write-Output ">>> Installing Python 3"
+              choco install python3 -y --no-progress
+              Write-Output "Python3 installation triggered"
+            }
+            function Install-Anaconda {
+              Write-Output ">>> Installing Anaconda3"
+              choco install anaconda3 -y --no-progress
+              Write-Output "Anaconda3 installation triggered"
+            }
+
+            $pkgList = $NumenPkgs -split ','
+            foreach ($rawPkg in $pkgList) {
+              $pkg = $rawPkg.Trim().ToLower()
+              switch -Wildcard ($pkg) {
+                "docker*"       { Install-Docker }
+                "vscode*"       { Install-VSCode }
+                "vs code*"      { Install-VSCode }
+                "code-server*"  { Install-VSCode }
+                "mambaforge*"   { Install-Mambaforge }
+                "mamba*"        { Install-Mambaforge }
+                "mamba / conda" { Install-Mambaforge }
+                "jupyterlab*"   { Install-JupyterLab }
+                "jupyter*"      { Install-JupyterLab }
+                "r runtime*"    { Install-R }
+                "rlang*"        { Install-R }
+                { $_ -eq "r" }  { Install-R }
+                "rstudio*"      { Install-RStudio }
+                "anaconda*"     { Install-Anaconda }
+                "git*"          { Install-Git }
+                "python3*"      { Install-Python3 }
+                "python*"       { Install-Python3 }
+                default         { Write-Output ">>> Unknown package '$pkg' — skipping" }
+              }
+            }
+            Write-Output "=== Numen package installer COMPLETE ==="
+          }
+          # ── End Numen package installer ─────────────────────────────────────────
+          </powershell>
+
+Outputs:
+  NumenInstanceId:
+    Description: The EC2 Instance ID
+    Value: !Ref NumenInstance

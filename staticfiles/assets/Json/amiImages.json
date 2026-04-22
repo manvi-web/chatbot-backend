@@ -1,0 +1,58 @@
+{
+  "Applications": [
+    {
+      "name": "cuda",
+      "packages": [],
+      "ec2imagebuilderinstance": "g5.xlarge:g5.2xlarge:g4dn.xlarge:g4dn.2xlarge",
+      "os": "alinux2",
+      "platform": "Linux",
+      "ami": "ami-06f59d3265152378c",
+      "comment": "AL2 CUDA/GPU AMI — used for Relion, cryoSPARC, Gromacs, AlphaFold, SBGrid, JupyterHub, Posit"
+    },
+    {
+      "name": "cuda",
+      "packages": [],
+      "ec2imagebuilderinstance": "g5.xlarge:g5.2xlarge:g4dn.xlarge:g4dn.2xlarge",
+      "os": "Ubuntu2004",
+      "platform": "Linux",
+      "ami": "ami-0fb0b230890ccd1e6",
+      "comment": "Ubuntu 20.04 CUDA/GPU AMI — used for SBGrid-Coot, SBGrid-Relion, SBGrid-Chimera"
+    },
+    {
+      "name": "warpem109",
+      "packages": ["warpem109", "windows"],
+      "ec2imagebuilderinstance": "g5.xlarge:g5.2xlarge:g4dn.xlarge:g4dn.2xlarge",
+      "os": "Windows",
+      "platform": "Windows",
+      "ami": "ami-05856bd26dd466893",
+      "comment": "Windows AMI — Warp'M"
+    },
+    {
+      "name": "alinux2-cpu",
+      "packages": [
+        "genomicsCli",
+        "biostatistics",
+        "collabDataScience",
+        "imagingDesktop",
+        "linux"
+      ],
+      "ec2imagebuilderinstance": "m6i.xlarge:m6i.2xlarge:m6i.4xlarge:r7i.xlarge:r7i.2xlarge:r7i.4xlarge",
+      "os": "alinux2",
+      "platform": "Linux",
+      "ami": "ami-058191ee3dc1ca9f7",
+      "comment": "AL2 AMI with NICE DCV 2023.0 pre-installed. Built 2026-04-15 from ami-0e10497160c48e829."
+    },
+    {
+      "name": "ubuntu2004-cpu",
+      "packages": [
+        "biostatistics",
+        "imagingDesktop"
+      ],
+      "ec2imagebuilderinstance": "m6i.xlarge:m6i.2xlarge:m6i.4xlarge",
+      "os": "Ubuntu2004",
+      "platform": "Linux",
+      "ami": "ami-0e10497160c48e829",
+      "comment": "Plain AL2 AMI used as Ubuntu2004 fallback for CPU apps until a dedicated Ubuntu CPU AMI is built"
+    }
+  ]
+}
