@@ -16,6 +16,8 @@ python-dateutil
 pytz
 sqlparse
 
+whitenoise
+python-dotenv
 beautifulsoup4
 simplejson
 urllib3==1.26.7

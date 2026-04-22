@@ -19,14 +19,24 @@ from datetime import date
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv()
-AWS_ACCESS_KEY_ID= os.getenv("AWS_ACCESS_KEY_ID")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-lb96lcz9$inn1&q4sv@6t62&!t!r9@h2t78%ds4#6*$dl(nsm9'
-DEBUG = True
-ALLOWED_HOSTS = ["*"]
+SECRET_KEY = os.environ.get(
+    "SECRET_KEY",
+    "django-insecure-lb96lcz9$inn1&q4sv@6t62&!t!r9@h2t78%ds4#6*$dl(nsm9"
+)
+
+DEBUG = os.environ.get("DEBUG", "False") == "True"
+
+RENDER_EXTERNAL_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 
 # Application definition
@@ -47,15 +57,14 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',
 ]
 
 ROOT_URLCONF = 'django_forms.urls'
@@ -123,15 +132,18 @@ USE_L10N = True
 
 USE_TZ = True
 
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
 STATIC_URL = '/static/'
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'staticfiles')]
+STATIC_ROOT = os.path.join(BASE_DIR, 'static_root')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
 MEDIA_URL = '/media/'
-if DEBUG:
-    STATICFILES_DIRS = [os.path.join(BASE_DIR, 'staticfiles')]
-else:
-    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/3.2/ref/settings/#default-auto-field
 
@@ -139,14 +151,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 ADMIN_SITE_HEADER = "Welcome to Clovertex Numen Platform"
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 DJANGO_TABLES2_TEMPLATE = "django_tables2/bootstrap4.html"
-loggerFIle = 'warning-'+str(date.today())+'.log'
-# Loggin Files
+loggerFIle = 'warning-' + str(date.today()) + '.log'
+
+# Logging Files
 LOGGING = {
     'version': 1,
-    # The version number of our log
     'disable_existing_loggers': False,
-    # django uses some of its own loggers for internal operations. In case you want to disable them just replace the False above with true.
-    # A handler for WARNING. It is basically writing the WARNING messages into a file called WARNING.log
     'handlers': {
         'file': {
             'level': 'WARNING',
@@ -154,16 +164,18 @@ LOGGING = {
             'filename': os.path.join(BASE_DIR, loggerFIle),
         },
     },
-    
-    # A logger for WARNING which has a handler called 'file'. A logger can have multiple handler
     'loggers': {
-       # notice the blank '', Usually you would put built in loggers like django or root here based on your needs
         '': {
-            'handlers': ['file'], #notice how file variable is called in handler which has been defined above
+            'handlers': ['file'],
             'level': 'WARNING',
             'propagate': True,
         },
     },
 }
-#CORS_ALLOWED_ORIGINS = ['https://internal-dev-numen-alb-001-1581971952.us-east-1.elb.amazonaws.com']
-CORS_ALLOWED_ORIGINS = ['https://internal-dev-numen-alb-001-1581971952.us-east-1.elb.amazonaws.com','http://localhost:3000','http://localhost:3001']
+
+# CORS
+CORS_ALLOWED_ORIGINS = [
+    'https://internal-dev-numen-alb-001-1581971952.us-east-1.elb.amazonaws.com',
+    'http://localhost:3000',
+    'http://localhost:3001',
+]
